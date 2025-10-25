@@ -1,2 +1,2 @@
-# prustio
-Tool for Rust embedded development
+# pRustIO [WIP]
+Tool for easier embedded Rust development
