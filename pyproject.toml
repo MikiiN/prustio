@@ -13,8 +13,8 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "typer[all]>=0.20.0"
+    "click>=8.3.0"
 ]
 
 [project.scripts]
-prustio = "cli:main"
+prustio = "cli:cli"
