@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prustio"
+version = "0.1.0"
+authors = [
+    {name = "Michal Zatecka", email = "zateckamichal8@gmail.com"},
+]
+description = "Tool for easier embedded Rust development."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.8"
+dependencies = [
+    "typer[all]>=0.20.0"
+]
+
+[project.scripts]
+prustio = "cli:main"
