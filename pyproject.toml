@@ -17,4 +17,4 @@ dependencies = [
 ]
 
 [project.scripts]
-prustio = "cli:cli"
+prustio = "main:entry_point"
