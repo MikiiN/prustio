@@ -3,11 +3,14 @@ import click
 import os
 import subprocess 
 
+from platformio.package.manager.platform import PlatformPackageManager
+from platformio.platform.exception import UnknownBoard
+
 from pathlib import Path
 from typing import IO, Any
 
 
-def cond_echo(
+def condition_echo(
     silent: bool,
     message: Any | None = None,
     file: IO[Any] | None = None,
@@ -17,6 +20,18 @@ def cond_echo(
 ) -> None:
     if not silent:
         click.echo(message, file, nl, err, color)
+
+
+def board_validation(ctx, param, value):
+    manager = PlatformPackageManager()
+    for id in value:
+        try:
+            manager.board_config(id)
+        except UnknownBoard as e:
+            raise click.BadParameter(
+                f"Unknown board with ID {id}"
+            )from ctx
+    return value
 
 
 @click.command("init", help="Initialize new project")
@@ -29,9 +44,10 @@ def cond_echo(
     "--name", "-n",
     default="project"
 )
-@click.option( # TODO board validation
+@click.option(
     "--board", "-b",
-    #callback=
+    "boards", multiple=True, metavar="ID",
+    callback=board_validation
 )
 @click.option("--sample-code", is_flag=True)
 @click.option("--silent", "-s", is_flag=True)
@@ -42,13 +58,13 @@ def project_init(
     sample_code: bool,
     silent: bool
 ):
-    cond_echo(silent, "Initializing project...")
+    condition_echo(silent, "Initializing project...")
     project_dir = Path(dir)
     if not project_dir.exists():
-        cond_echo("  Creating project directory...")
+        condition_echo("  Creating project directory...")
         project_dir.mkdir()
     
-    cond_echo(silent, "  Initializing cargo...")
+    condition_echo(silent, "  Initializing cargo...")
     result = subprocess.run(
         ["cargo", "init", "--name", name],
         cwd=project_dir,
@@ -63,11 +79,11 @@ def project_init(
     if not pio_dir.exists():
         pio_dir.mkdir()
 
-    cond_echo(silent, "  Initializing platformIO...")
+    condition_echo(silent, "  Initializing platformIO...")
     result = subprocess.run(
         ["pio", "init"],
         cwd=pio_dir,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )
-    cond_echo(silent, "  Done")
+    condition_echo(silent, "  Done")
