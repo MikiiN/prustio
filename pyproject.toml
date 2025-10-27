@@ -14,7 +14,7 @@ license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.3.0",
-    "platformio>=6.1.18"
+    "platformio>=6.1.18",
 ] 
 
 [project.scripts]

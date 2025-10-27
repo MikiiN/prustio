@@ -46,7 +46,7 @@ def board_validation(ctx, param, value):
 )
 @click.option(
     "--board", "-b",
-    "boards", multiple=True, metavar="ID",
+    multiple=True, metavar="ID",
     callback=board_validation
 )
 @click.option("--sample-code", is_flag=True)
