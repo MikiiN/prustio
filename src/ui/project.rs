@@ -1,6 +1,6 @@
 use clap::Subcommand;
 
-// Subcommands for project
+// Subcommands for project command
 #[derive(Subcommand)]
 pub enum ProjectCommands {
     Init {
