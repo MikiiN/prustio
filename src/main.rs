@@ -1,7 +1,6 @@
-use clap::Parser;
-
+mod controller;
 mod ui;
 
 fn main() {
-    let cli = ui::Cli::parse();
+    controller::execute();
 }

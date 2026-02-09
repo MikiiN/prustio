@@ -1,19 +1,19 @@
 use clap::{Parser, Subcommand};
 
-mod project;
-mod device;
+pub mod project;
+pub mod device;
 
 #[derive(Parser)]
 #[command(name = "PrustIO")]
 #[command(about = "A project manager for Rust embedded projects.", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
-    command: TopLevelCommands,
+    pub(crate) command: TopLevelCommands,
 }
 
 // The main categories
 #[derive(Subcommand)]
-enum TopLevelCommands {
+pub enum TopLevelCommands {
     Boards {
         filter: Option<String>,
 
