@@ -4,7 +4,6 @@ use clap::Subcommand;
 #[derive(Subcommand)]
 pub enum ProjectCommands {
     Init {
-        #[arg(short, long)]
         name: Option<String>,
 
         #[arg(short, long)]
