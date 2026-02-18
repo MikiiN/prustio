@@ -1,5 +1,4 @@
 use clap::Parser;
-use std::path::PathBuf;
 
 use crate::ui;
 use crate::ui::device::DeviceCommands;

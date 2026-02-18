@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::wrapper::cargo;
-use crate::model::boards::{self, Board};
+use crate::model::boards;
 
 const DEFAULT_PROJECT_NAME: &str = "project";
 
@@ -43,6 +43,22 @@ pub fn init_project(
         }
     }
 
+    match cargo::create_toolchain_config(&project) {
+        Ok(_) => {},
+        Err(_) => {
+            eprintln!("Error: Failed to create toolchain configuration file.");
+            return;
+        },
+    }
+
+    match cargo::init_cargo_toml_config(&project) {
+        Ok(_) => {},
+        Err(_) => {
+            eprintln!("Error: Failed to modify Cargo.toml file.");
+            return;
+        }
+    }
+
     let (b_arch, b_mcu): (Option<String>, Option<String>) = match board_id {
         Some(id) => {
             match boards::get_board(id) {
@@ -54,8 +70,13 @@ pub fn init_project(
                             return;
                         },
                     };
-                    // TODO - check errors
-                    let _ = cargo::create_cargo_config(&project, &arch, &b.mcu);
+                    match cargo::create_cargo_config(&project, &arch, &b.mcu) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            eprintln!("Error: Failed to create cargo configuration.");
+                            return;
+                        }
+                    }
                     (Some(arch), Some(b.mcu))
                 },
                 Err(e) => {
