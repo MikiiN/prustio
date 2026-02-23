@@ -51,7 +51,7 @@ pub fn init_project(
         },
     }
 
-    match cargo::init_cargo_toml_config(&project) {
+    match cargo::create_cargo_toml_config(&project) {
         Ok(_) => {},
         Err(_) => {
             eprintln!("Error: Failed to modify Cargo.toml file.");

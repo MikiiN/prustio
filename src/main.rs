@@ -1,7 +1,9 @@
 mod controller;
-mod ui;
-mod wrapper;
+mod dependencies;
 mod model;
+mod ui;
+mod utils;
+mod wrapper;
 
 fn main() {
     controller::execute();

@@ -25,9 +25,6 @@ pub fn execute() {
                 let _ = json_output;
             },
             ProjectCommands::Init { name, board, hybrid, json_output } => {
-                // let _ = board;
-                // let _ = hybrid;
-                // let _ = json_output;
                 ctr_project::init_project(name, board, hybrid, json_output);
             },
             ProjectCommands::Remove { package, json_output } => {

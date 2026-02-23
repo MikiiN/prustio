@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio, ExitStatus};
 use toml_edit::{DocumentMut, Item, Table, Array, ArrayOfTables, value};
@@ -29,35 +28,52 @@ pub fn create_cargo_config(
     fs::create_dir_all(&dir_path)?;
 
     let file_path = dir_path.join(CONFIGURATION_FILE_NAME);
-    let mut file = fs::File::create(file_path)?; 
+    let mut toml = DocumentMut::new();
 
-    let content = get_config_toml_content(target_architecture, target_mcu);
-    file.write_all(content.as_bytes())?;
+    get_config_toml_content(&mut toml, target_architecture, target_mcu);
+    
+    fs::write(file_path, toml.to_string())?;
     Ok(())
 }
 
 pub fn create_toolchain_config(proj_path: &String) -> std::io::Result<()> {
     let file_path = PathBuf::from(proj_path).join(RUST_TOOLCHAIN_FILE_NAME);
-    let mut file = fs::File::create(&file_path)?;
-    let content = get_toolchain_content();
-    file.write_all(content.as_bytes())?;
+    let mut toml = DocumentMut::new();
+
+    get_toolchain_content(&mut toml);
+
+    fs::write(&file_path, toml.to_string())?;
     Ok(())
 }
 
-pub fn init_cargo_toml_config(proj_path: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_cargo_toml_config(proj_path: &String) -> Result<(), Box<dyn std::error::Error>> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
     let cargo_content = fs::read_to_string(&file_path)?;
     let mut toml = cargo_content.parse::<DocumentMut>()?;
 
+    get_cargo_toml_content(&mut toml);
+
+    fs::write(&file_path, toml.to_string())?;
+    Ok(())
+}
+
+fn get_cargo_toml_content(toml: &mut DocumentMut) {
+    // get project name from cargo.toml
+    let proj_name = match toml["package"]["name"].as_str() {
+        Some(name) => name,
+        None => "project",
+    };
+
+    // [bin]
     let mut bin_table = Table::new();
-    bin_table["name"] = value("teplate-proj");
+    bin_table["name"] = value(proj_name);
     bin_table["test"] = value(false);
     bin_table["bench"] = value(false);
-
     let mut bin_array = ArrayOfTables::new();
     bin_array.push(bin_table);
     toml["bin"] = Item::ArrayOfTables(bin_array);
 
+    // [dependencies]
     toml["dependencies"] = Item::Table(Table::new());
     toml["dependencies"]["panic-halt"] = value("1.0.0");
     toml["dependencies"]["ufmt"] = value("0.2.0");
@@ -71,15 +87,14 @@ pub fn init_cargo_toml_config(proj_path: &String) -> Result<(), Box<dyn std::err
     let mut features = Array::new();
     features.push("arduino-uno");
     arduino["features"] = value(features);
-    
     toml["dependencies"]["arduino-hal"] = Item::Table(arduino);
+    
+    // [profile]
     toml["profile"] = Item::Table(Table::new());
-
     let mut dev = Table::new();
     dev["panic"] = value("abort");
     dev["lto"] = value(true);
     dev["opt-level"] = value("s");
-    
     toml["profile"]["dev"] = Item::Table(dev);
 
     let mut release = Table::new();
@@ -88,33 +103,38 @@ pub fn init_cargo_toml_config(proj_path: &String) -> Result<(), Box<dyn std::err
     release["debug"] = value(true);
     release["lto"] = value(true);
     release["opt-level"] = value("s");
-
     toml["profile"]["release"] = Item::Table(release);
-
-    fs::write(&file_path, toml.to_string())?;
-    Ok(())
 }
 
-fn get_toolchain_content() -> String {
-    String::from(
-"[toolchain]
-channel = \"nightly-2025-04-27\"
-components = [\"rust-src\"]
-profile = \"minimal\"
-")
+fn get_toolchain_content(toml: &mut DocumentMut) {
+    let mut toolchain = Table::new();
+    toolchain["channel"] = value("nightly-2025-04-27");
+    let mut components = Array::new();
+    components.push("rust-src");
+    toolchain["components"] = value(components);
+    toolchain["profile"] = value("minimal");
+    toml["toolchain"] = Item::Table(toolchain);    
 }
 
 fn get_config_toml_content(
+    toml: &mut DocumentMut,
     target_architecture: &String,
     target_mcu: &String,
-) -> String {
+) {
     let arch = target_architecture.to_ascii_lowercase();
     let mcu = target_mcu.to_ascii_lowercase();
-    format!("[build]
-target = \"{arch}\"
-rustflags = [\"-C\", \"target-cpu={mcu}\"]
 
-[unstable]
-build-std = [\"core\"]
-")
+    let mut build = Table::new();
+    build["target"] = value(arch);
+    let mut flags = Array::new();
+    flags.push("-C");
+    flags.push(format!("target-cpu={mcu}").as_str());
+    build["rustflags"] = value(flags);
+    toml["build"] = Item::Table(build);
+
+    let mut unstable = Table::new();
+    let mut builds = Array::new();
+    builds.push("core");
+    unstable["build-std"] = value(builds);
+    toml["unstable"] = Item::Table(unstable);
 }
