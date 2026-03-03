@@ -1,5 +1,4 @@
 mod controller;
-mod dependencies;
 mod model;
 mod ui;
 mod utils;

@@ -15,6 +15,13 @@ impl Board {
             _ => None,
         }
     }
+
+    pub fn get_cargo_feature(&self) -> Option<&str> {
+        match self.id.as_str() {
+            "uno" => Some("arduino-uno"),
+            _ => None,
+        }
+    }
 }
 
 pub fn get_board(id: &str) -> Result<Board, &str> {

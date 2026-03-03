@@ -3,12 +3,27 @@ use clap::Parser;
 use crate::ui;
 use crate::ui::device::DeviceCommands;
 use crate::ui::project::ProjectCommands;
+use crate::wrapper::platformio;
 
 mod ctr_project;
 
 pub fn execute() {
-    let cli = ui::Cli::parse();
+    if !platformio::check_pio_installation() {
+        match platformio::setup_platformio() {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("Can not install application's instance of PlatformIO:\n{}", e);
+                return;
+            }
+        }
+    }
 
+    let cli = ui::Cli::parse();
+    run_command(&cli);
+
+}
+
+fn run_command(cli: &ui::Cli) {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
             let _ = filter; 
