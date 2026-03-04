@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use crate::wrapper;
 
-const UNSPECIFIED_BOARD_PARAM: &str = "UNSPECIFIED";
+pub const UNSPECIFIED_BOARD_PARAM: &str = "UNSPECIFIED";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Board {

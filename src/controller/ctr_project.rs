@@ -59,7 +59,12 @@ pub fn init_project(
         }
     }
 
-    match prustio_init(&proj_path, &proj_name, hybrid) {
+    let framework = if *hybrid {
+        Some(String::from("arduino"))
+    } else {
+        None
+    };
+    match prustio_init(&proj_path, &proj_name, hybrid, &board.id, &framework) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -118,8 +123,14 @@ fn cargo_init(
     Ok(())
 }
 
-fn prustio_init(proj_path: &PathBuf, proj_name: &String, hybrid: &bool) -> Result<(), String> {
-    match prustio_config::create_prustio_config(proj_path, proj_name, hybrid) {
+fn prustio_init(
+    proj_path: &PathBuf, 
+    proj_name: &String, 
+    hybrid: &bool,
+    board_id: &String,
+    framework: &Option<String>,
+) -> Result<(), String> {
+    match prustio_config::create_prustio_config(proj_path, proj_name, hybrid, board_id, framework) {
         Ok(_) => {},
         Err(_) => {
             return Err(String::from("Failed to create PrustIO configuration file."));
