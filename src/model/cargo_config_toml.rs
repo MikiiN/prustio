@@ -7,7 +7,7 @@ const CONFIGURATION_FILE_NAME: &str = "config.toml";
 
 
 pub fn create_cargo_config(
-    proj_path: &String,
+    proj_path: &PathBuf,
     target_architecture: &String,
     target_mcu: &String,
 ) -> std::io::Result<()> {

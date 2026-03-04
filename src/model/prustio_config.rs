@@ -5,7 +5,7 @@ use toml_edit::{DocumentMut, Item, Table, Array, ArrayOfTables, value};
 const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 
 pub fn create_prustio_config(
-    proj_path: &String,
+    proj_path: &PathBuf,
     project_name: &String,
     hybrid_mode: &bool,
 
@@ -31,4 +31,25 @@ pub fn write_prustio_init_config(
     package["mode"] = value(*hybrid_mode); 
 
     toml["package"] = Item::Table(package);
+}
+
+pub fn add_prustio_config_target(
+    toml: &mut DocumentMut,
+    target_name: &String,
+    target_platform: &String,
+    target_board: &String,
+    target_framework: Option<&String>,
+) {
+    let mut target = Table::new();
+    target["platform"] = value(target_platform);
+    target["board"] = value(target_board);
+    match target_framework {
+        Some(f) => target["framework"] = value(f),
+        None => (),
+    };
+
+    if !toml["target"].is_table() {
+        toml["target"] = Item::Table(Table::new());
+    }
+    toml["target"][target_name] = Item::Table(target);
 }

@@ -15,91 +15,115 @@ pub fn init_project(
         Some(n) => n,
         None => &String::from(DEFAULT_PROJECT_NAME),
     };
-    let path: PathBuf = PathBuf::from(&proj_name);
+    let proj_path: PathBuf = PathBuf::from(&proj_name);
 
-    if path.exists() {
-        eprintln!("Error: The project already exists.");
+    if proj_path.exists() {
+        eprintln!("Error: The project or folder with same name already exists.");
         return;
     }
 
-    let project: String = match path.into_os_string().into_string() {
-        Ok(p) => p,
-        Err(os_str) => {
-            eprintln!("Error: Invalid working directory path:\n{:?}", os_str);
-            return;
-        },
-    };
-    let result = cargo::init_cargo(&project);
-    match result {
-        Ok(status) => {
-            if status.success() {
-                println!("Cargo project created.");
-            } else {
-                eprintln!("Error: Cargo init failed with code: {}", status);
+    let board = match board_id {
+        Some(id) => {
+            match boards::get_board(id) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return;
+                }
             }
-        },
+        }
+        None => boards::get_unspecified_board()
+    };
+
+    let board_arch = match board.get_architecture() {
+        Some(arch) => arch,
+        None => {
+            eprintln!("Error: Unsupported board.");
+            return;
+        }
+    };
+    let board_feature_cargo = match board.get_cargo_feature() {
+        Some(feature) => feature,
+        None => {
+            eprintln!("Error: Unsupported board.");
+            return;
+        }
+    };
+
+
+    match cargo_init(&proj_path, &board_arch, &board.mcu, &board_feature_cargo) {
+        Ok(_) => (),
         Err(e) => {
-            eprintln!("Error: Failed to execute the cargo command:\n {}",e);
+            eprintln!("Error: {}", e);
             return;
         }
     }
 
-    match prustio_config::create_prustio_config(&project, &proj_name, hybrid) {
-        Ok(_) => {},
-        Err(_) => {
-            eprintln!("Error: Failed to create PrustIO configuration file.");
+    match prustio_init(&proj_path, &proj_name, hybrid) {
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Error: {}", e);
             return;
-        },
-    };
+        }
+    }
+    
+   
+}
 
-    match toolchain_toml::create_toolchain_config(&project) {
+fn cargo_init(
+    proj_path: &PathBuf, 
+    board_arch: &String, 
+    board_mcu: &String,
+    cargo_feature: &String,
+) -> Result<(), String> {
+    match cargo::init_cargo(proj_path) {
+        Ok(status) => {
+            if !status.success() {
+                return Err(format!("Cargo init failed with code: {status}"));
+            }
+        },
+        Err(e) => {
+            return Err(format!("Failed to execute the cargo command:\n {e}"));
+        }
+    }
+
+    match toolchain_toml::create_toolchain_config(proj_path) {
         Ok(_) => {},
         Err(_) => {
-            eprintln!("Error: Failed to create toolchain configuration file.");
-            return;
+            return Err(String::from("Failed to create toolchain configuration file."));
         },
     }
 
-    let (b_arch, b_mcu): (Option<String>, Option<String>) = match board_id {
-        Some(id) => {
-            match boards::get_board(id) {
-                Ok(b) => {
-                    let arch = match b.get_architecture() {
-                        Some(a) => a,
-                        None => {
-                            eprintln!("Error: Unsupported board");
-                            return;
-                        },
-                    };
-                    let feature = match b.get_cargo_feature() {
-                        Some(f) => f,
-                        None => {
-                            "None"
-                        }
-                    };
-                    match cargo_config_toml::create_cargo_config(&project, &arch, &b.mcu) {
-                        Ok(_) => {},
-                        Err(_) => {
-                            eprintln!("Error: Failed to create cargo configuration.");
-                            return;
-                        }
-                    };
-                     match cargo_toml::create_cargo_toml_config(&project, &feature) {
-                        Ok(_) => {},
-                        Err(_) => {
-                            eprintln!("Error: Failed to modify Cargo.toml file.");
-                            return;
-                        }
-                    }
-
-                    (Some(arch), Some(b.mcu))
-                },
-                Err(e) => {
-                    eprintln!("{}", e);
-                    return;
-                }
-            }
-        },
-        None => (None, None),
+    match cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("Failed to create cargo configuration."));
+        }
     };
+
+    match cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("Failed to create cargo configuration."));
+        }
+    };
+
+    match cargo_toml::create_cargo_toml_config(proj_path, cargo_feature) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("Failed to create cargo configuration."));
+        }
+    }
+
+    Ok(())
+}
+
+fn prustio_init(proj_path: &PathBuf, proj_name: &String, hybrid: &bool) -> Result<(), String> {
+    match prustio_config::create_prustio_config(proj_path, proj_name, hybrid) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("Failed to create PrustIO configuration file."));
+        },
+    };
+    Ok(())
 }

@@ -4,7 +4,7 @@ use toml_edit::{DocumentMut, Item, Table, Array, ArrayOfTables, value};
 
 const CARGO_TOML_FILE_NAME: &str = "Cargo.toml";
 
-pub fn create_cargo_toml_config(proj_path: &String, board_feature: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_cargo_toml_config(proj_path: &PathBuf, board_feature: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
     let cargo_content = fs::read_to_string(&file_path)?;
     let mut toml = cargo_content.parse::<DocumentMut>()?;
