@@ -1,7 +1,14 @@
 use std::path::PathBuf;
 
 use crate::wrapper::cargo;
-use crate::model::{boards, cargo_config_toml, cargo_toml, prustio_config, toolchain_toml};
+use crate::model::{
+    boards, 
+    cargo_config_toml,
+    cargo_toml, 
+    prustio_config, 
+    toolchain_toml, 
+    source_code
+};
 
 const DEFAULT_PROJECT_NAME: &str = "project";
 
@@ -117,6 +124,13 @@ fn cargo_init(
         Ok(_) => {},
         Err(_) => {
             return Err(String::from("Failed to create cargo configuration."));
+        }
+    }
+
+    match source_code::write_example_code(proj_path) {
+        Ok(_) => {},
+        Err(e) => {
+            return Err(e);
         }
     }
 

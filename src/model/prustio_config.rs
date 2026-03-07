@@ -1,10 +1,34 @@
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use toml_edit::{DocumentMut, Item, Table, Array, ArrayOfTables, value};
+use toml_edit::{Array, DocumentMut, Item, Table, value};
 
 use crate::model::boards;
 
 const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
+
+#[derive(Debug, Deserialize)]
+pub struct Env {
+    targets: Option<Vec<String>>,
+    board: String,
+    framework: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GlobalEnv {
+    targets: Option<Vec<String>>,
+    board: Option<String>,
+    framework: Option<String>,
+
+    #[serde(flatten)]  
+    envs: HashMap<String, Env>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Configuration {
+    env: GlobalEnv,
+}
 
 pub fn create_prustio_config(
     proj_path: &PathBuf,
@@ -19,7 +43,7 @@ pub fn create_prustio_config(
     write_prustio_init_config(&mut toml, &project_name, &hybrid_mode);
 
     if board_id != boards::UNSPECIFIED_BOARD_PARAM {
-        add_prustio_config_target(&mut toml, board_id, board_id, framework);
+        add_prustio_config_env(&mut toml, board_id, &Vec::new(), board_id, framework);
     }
 
     fs::write(&file, toml.to_string())?;
@@ -40,30 +64,62 @@ pub fn write_prustio_init_config(
     toml["package"] = Item::Table(package);
 }
 
-pub fn add_prustio_config_target(
+pub fn add_prustio_config_env(
     toml: &mut DocumentMut,
-    target_name: &String,
-    // target_platform: &String,
-    target_board: &String,
-    target_framework: &Option<String>,
+    env_name: &String,
+    env_targets: &Vec<String>,
+    // env_platform: &String,
+    env_board: &String,
+    env_framework: &Option<String>,
 ) {
-    let mut target = Table::new();
-    // target["platform"] = value(target_platform);
-    target["board"] = value(target_board);
-    match target_framework {
-        Some(f) => target["framework"] = value(f),
+    let mut env = Table::new();
+    if !env_targets.is_empty() {
+        let mut targets = Array::new();
+        for t in env_targets {
+            targets.push(t.clone());
+        }
+        env["targets"] = value(targets);
+    }
+
+    // env["platform"] = value(env_platform);
+    env["board"] = value(env_board);
+    match env_framework {
+        Some(f) => env["framework"] = value(f),
         None => (),
     };
     
-    if let Some(t) = toml.get("target") {
+    if let Some(t) = toml.get("env") {
         if !t.is_table() {
             // TODO
-            println!("Error: target is invalid element");
+            println!("Error: env is invalid element");
         }
     }
     else {
-        toml["target"] = Item::Table(Table::new());
+        toml["env"] = Item::Table(Table::new());
     }
-    toml["target"][target_name] = Item::Table(target);
+    toml["env"][env_name] = Item::Table(env);
+}
 
+pub fn get_env(proj_path: &PathBuf) -> Result<GlobalEnv, String> {
+    let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
+    if !config_file.exists() {
+        return Err(String::from("Missing PrustIO configuration file."));
+    }
+
+    let content = match fs::read_to_string(&config_file) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(String::from("Failed to read PrustIO configuration file."));
+        },
+    };
+    
+    let config: Configuration = match toml_edit::de::from_str(&content) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Error: {:?}",e);
+            return Err(String::from("Failed to parse PrustIO configuration file."));
+        }
+    };
+
+    return Ok(config.env);
 }

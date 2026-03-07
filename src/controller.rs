@@ -50,8 +50,9 @@ fn run_command(cli: &ui::Cli) {
                 let _ = json_output;
             },
         },
-        ui::TopLevelCommands::Run {target, json_output} => {
+        ui::TopLevelCommands::Run {target, environment, json_output} => {
             let _ = target;
+            let _ = environment;
             let _ = json_output;
         },
     }

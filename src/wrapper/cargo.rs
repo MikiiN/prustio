@@ -15,3 +15,13 @@ pub fn init_cargo(proj_path: &PathBuf) -> std::io::Result<ExitStatus> {
         .status();
     return status;
 }
+
+pub fn cargo_build(proj_path: &PathBuf) -> std::io::Result<ExitStatus> {
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build");
+    let status = cmd
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status();
+    return status;
+}

@@ -34,41 +34,12 @@ pub enum TopLevelCommands {
     
     // Run targets
     Run {
+        #[arg(short, long)]
         target: Option<String>,
+        #[arg(short, long)]
+        environment: Option<String>,
 
         #[arg(long)]
         json_output: bool,
     }
 }
-
-// impl Cli {
-//     pub fn get_arguments(&self) -> CommandArgs {
-//         match &self.command {
-//             TopLevelCommands::Project { command } => match command {
-//                 project::ProjectCommands::Add {package, json_output} => {
-//                     CommandArgs::ProjAdd(ProjAddRemoveArguments::new(package, json_output))
-//                 },
-//                 project::ProjectCommands::Init {name, board, hybrid, json_output} => {
-//                     CommandArgs::ProjInit(
-//                         ProjInitArguments::new(name, board, hybrid, json_output)
-//                     )
-//                 },
-//                 project::ProjectCommands::Remove {package, json_output} => {
-//                     CommandArgs::ProjRemove(
-//                         ProjAddRemoveArguments::new(package,json_output)
-//                     )
-//                 },
-//                 project::ProjectCommands::Tasks {json_output} => {
-//                     CommandArgs::ProjTasks(
-//                         ProjTasksArguments::new(json_output)
-//                     )
-//                 },
-//             },
-//             TopLevelCommands::Run {target, json_output} => {
-//                 CommandArgs::Run(
-//                     RunArguments::new(target, json_output)
-//                 )
-//             },
-//         }
-//     }
-// }
