@@ -10,19 +10,19 @@ const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 
 #[derive(Debug, Deserialize)]
 pub struct Env {
-    targets: Option<Vec<String>>,
-    board: String,
-    framework: Option<String>,
+    pub targets: Option<Vec<String>>,
+    pub board: String,
+    pub framework: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GlobalEnv {
-    targets: Option<Vec<String>>,
-    board: Option<String>,
-    framework: Option<String>,
+    pub targets: Option<Vec<String>>,
+    pub board: Option<String>,
+    pub framework: Option<String>,
 
     #[serde(flatten)]  
-    envs: HashMap<String, Env>,
+    pub envs: HashMap<String, Env>,
 }
 
 #[derive(Debug, Deserialize)]

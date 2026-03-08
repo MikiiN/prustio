@@ -51,3 +51,9 @@ pub fn get_app_dir() -> Result<PathBuf, String>  {
     ensure_dir_existence(&app_dir)?;
     return Ok(app_dir);
 }
+
+// TODO - do better checks
+pub fn check_if_project_dir(path: &PathBuf) -> bool {
+    let conf_file = path.join("Prustio.toml");
+    conf_file.exists()
+}

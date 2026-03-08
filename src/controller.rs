@@ -6,6 +6,7 @@ use crate::ui::project::ProjectCommands;
 use crate::wrapper::platformio;
 
 mod ctr_project;
+mod ctr_run;
 
 pub fn execute() {
     if !platformio::check_pio_installation() {
@@ -51,9 +52,7 @@ fn run_command(cli: &ui::Cli) {
             },
         },
         ui::TopLevelCommands::Run {target, environment, json_output} => {
-            let _ = target;
-            let _ = environment;
-            let _ = json_output;
+            ctr_run::run(target, environment, json_output);
         },
     }
 }
