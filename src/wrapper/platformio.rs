@@ -1,5 +1,8 @@
+use std::io::Error;
 use std::path::PathBuf;
 use std::process::{Command, Output};
+
+use clap::builder::Str;
 
 use crate::utils::{
     ensure_dir_existence,
@@ -61,16 +64,73 @@ pub fn setup_platformio() -> Result<(), String> {
     Ok(())
 }
 
-fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str]) {
+pub fn download_pio_toolchain(toolchain_name: &str) -> Result<(), String> {
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let args = [
+        "pkg", 
+        "install", 
+        "--global", 
+        "--tool", 
+        toolchain_name,
+    ];
+    // TODO check output.status
+    match run_pio_command(&venv_dir, &core_dir, &args) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("PlatformIO failed to install toolchain."));
+        } 
+    };
+    
+    Ok(())
+}
+
+pub fn download_pio_platform(platform_name: &str) -> Result<(), String> {
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let args = [
+        "pkg", 
+        "install", 
+        "--global", 
+        "--platform", 
+        platform_name,
+    ];
+    // TODO check output.status
+    match run_pio_command(&venv_dir, &core_dir, &args) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err(String::from("PlatformIO failed to install toolchain."));
+        } 
+    };
+    
+    Ok(())
+}
+
+pub fn get_devices() -> Result<Vec<u8>, String> {
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let args = [
+        "device", "list", "--json-output"
+    ];
+    let output = match run_pio_command(&venv_dir, &core_dir, &args) {
+        Ok(output) => output,
+        Err(_) => {
+            return Err(String::from("PlatformIO failed to get device list."));
+        } 
+    };
+
+    if !output.status.success() {
+        return Err(String::from("PlatformIO failed to execute command"));
+    }
+
+    Ok(output.stdout)
+}
+
+// TODO move getting directories to here (less parameters)
+fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str]) -> Result<Output, Error> {
     let pio_path = get_venv_executable(venv_dir, "pio");
 
-    let status = Command::new(pio_path)
+    let output = Command::new(pio_path)
         .env("PLATFORMIO_CORE_DIR", core_dir) 
         .args(pio_args)
-        .status()
-        .expect("Failed to execute pio command.");
+        .output();
 
-    if !status.success() {
-        eprintln!("PlatformIO command failed.");
-    }
+    return output;
 }

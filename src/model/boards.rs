@@ -1,7 +1,12 @@
+use std::fs;
+
 use serde::Deserialize;
-use crate::wrapper;
+
+use crate::wrapper::platformio;
 
 pub const UNSPECIFIED_BOARD_PARAM: &str = "UNSPECIFIED";
+const PLATFORMS_DIR: &str = "platforms";
+const ATMELAVR_BOARDS_DIR: &str = "atmelavr/boards";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Board {
@@ -32,6 +37,44 @@ impl Board {
     }
 }
 
+#[derive(Deserialize, Debug)]
+struct BoardManifest {
+    name: String,
+    upload: UploadConfig,
+    build: Option<BuildConfig>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UploadConfig {
+    pub speed: u32, 
+    pub protocol: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct BuildConfig {
+    mcu: Option<String>,
+}
+
+// TODO make general (now only support atmel AVR)
+pub fn get_upload_config(board_id: &String) -> Result<UploadConfig, String> {
+    let (_, core_dir) = platformio::get_pio_dirs()?;
+    let confs_path = core_dir.join(PLATFORMS_DIR).join(ATMELAVR_BOARDS_DIR);
+    if !confs_path.exists() {
+        platformio::download_pio_platform("atmelavr")?;
+    }
+    
+    let board_path = confs_path.join(format!("{board_id}.json"));
+    if !board_path.exists() {
+        return Err(String::from("Unknown board ID."));
+    }
+    let file_contents = fs::read_to_string(&board_path)
+            .expect("Failed to read board JSON file");
+
+    let manifest: BoardManifest = serde_json::from_str(&file_contents)
+            .expect("Failed to parse board JSON");
+    Ok(manifest.upload)
+}
+
 pub fn get_board(id: &str) -> Result<Board, &str> {
     match get_boards(id) {
         Ok(boards) => {
@@ -49,7 +92,7 @@ pub fn get_board(id: &str) -> Result<Board, &str> {
 }
 
 pub fn get_boards(filter: &str) -> Result<Vec<Board>, &str> {
-    let result = wrapper::platformio::get_boards(filter);
+    let result = platformio::get_boards(filter);
     match result {
         Ok(output) => {
             let output_str = String::from_utf8_lossy(&output.stdout);

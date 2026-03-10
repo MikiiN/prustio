@@ -1,6 +1,7 @@
 pub mod boards;
 pub mod cargo_config_toml;
 pub mod cargo_toml;
+pub mod device;
 pub mod prustio_config;
 pub mod source_code;
 pub mod toolchain_toml;

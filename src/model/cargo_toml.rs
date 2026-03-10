@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use toml_edit::{DocumentMut, Item, Table, Array, ArrayOfTables, value};
 
 const CARGO_TOML_FILE_NAME: &str = "Cargo.toml";
+const DEFAULT_BIN_NAME: &str = "bin";
+const DEFAULT_MAIN_PATH: &str = "src/main.rs";
 
 pub fn create_cargo_toml_config(proj_path: &PathBuf, board_feature: &str) -> Result<(), Box<dyn std::error::Error>> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
@@ -17,14 +19,15 @@ pub fn create_cargo_toml_config(proj_path: &PathBuf, board_feature: &str) -> Res
 
 fn write_cargo_toml_content(toml: &mut DocumentMut, board_feature: &str) {
     // get project name from cargo.toml
-    let proj_name = match toml["package"]["name"].as_str() {
-        Some(name) => name,
-        None => "project",
-    };
+    // let proj_name = match toml["package"]["name"].as_str() {
+    //     Some(name) => name,
+    //     None => "project",
+    // };
 
     // [bin]
     let mut bin_table = Table::new();
-    bin_table["name"] = value(proj_name);
+    bin_table["name"] = value(DEFAULT_BIN_NAME);
+    bin_table["path"] = value(DEFAULT_MAIN_PATH);
     bin_table["test"] = value(false);
     bin_table["bench"] = value(false);
     let mut bin_array = ArrayOfTables::new();

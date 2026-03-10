@@ -8,10 +8,10 @@ use crate::model::boards;
 
 const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Env {
     pub targets: Option<Vec<String>>,
-    pub board: String,
+    pub board: Option<String>,
     pub framework: Option<String>,
 }
 
@@ -23,6 +23,16 @@ pub struct GlobalEnv {
 
     #[serde(flatten)]  
     pub envs: HashMap<String, Env>,
+}
+
+impl GlobalEnv {
+    pub fn to_env(&self) -> Env {
+        Env { 
+            targets: self.targets.clone(), 
+            board: self.board.clone(), 
+            framework: self.framework.clone() 
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

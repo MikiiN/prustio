@@ -1,14 +1,18 @@
 use std::env;
+use std::path::PathBuf;
 
-use crate::model::prustio_config;
+use crate::model::{boards, cargo_config_toml, cargo_toml, prustio_config, device};
 use crate::utils;
+use crate::wrapper::{cargo, avr_objcopy, avrdude};
+
+const DEFAULT_ELF_BIN_NAME: &str = "bin.elf";
+const DEFAULT_HEX_BIN_NAME: &str = "bin.hex"; 
 
 pub fn run(
     target: &Option<String>,
     environment: &Option<String>,
     json_output: &bool,
 ) {
-    // TODO check if current dir is project
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
@@ -21,21 +25,142 @@ pub fn run(
         return;
     }
 
-    let envs = match prustio_config::get_env(&proj_path) {
+    let config = match prustio_config::get_env(&proj_path) {
         Ok(val) => val,
         Err(e) => {
             eprintln!("Error: {}", e);
             return;
         }
     };
-    match environment {
-        Some(e) => {
-            if envs.envs.contains_key(e) {
 
+    let env = match environment {
+        Some(e) => {
+            if config.envs.contains_key(e) {
+                config.envs[e].clone()
+            } else {
+                eprintln!("Error: Invalid environment name.");
+                return;
             }
         },
         None => {
-
+            config.to_env()
         }
     };
+
+    // TODO target usage
+    let target = match target {
+        Some(t) => {
+            // TODO target validation
+            Vec::from([t.clone()])
+        },
+        None => {
+            match env.targets {
+                Some(ts) => ts,
+                None => {
+                    let mut ts: Vec<String> = Vec::new();
+                    ts.push(String::from("upload"));
+                    ts
+                }
+            }
+        }
+    };
+
+    let board = match env.board {
+        Some(id) => {
+            match boards::get_board(&id) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return;
+                }
+            }
+        }
+        None => {
+            eprintln!("Error: Unsupported board.");
+            return;
+        }
+    };
+    let board_arch = match board.get_architecture() {
+        Some(arch) => arch,
+        None => {
+            eprintln!("Error: Unsupported board.");
+            return;
+        }
+    };
+    let board_feature_cargo = match board.get_cargo_feature() {
+        Some(feature) => feature,
+        None => {
+            eprintln!("Error: Unsupported board.");
+            return;
+        }
+    };
+
+    match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu) {
+        Ok(_) => {},
+        Err(_) => {
+            eprintln!("Error: Failed to update project configuration");
+            return;
+        }
+    }
+
+    match cargo_toml::create_cargo_toml_config(&proj_path, &board_feature_cargo) {
+        Ok(_) => {},
+        Err(_) => {
+            eprintln!("Error: Failed to update project configuration");
+            return;
+        }
+    }
+
+    match cargo::cargo_build(&proj_path, &None) {
+        Ok(_) => {},
+        Err(_) => {
+            eprintln!("Error: Failed to build project");
+            return;
+        }
+    }
+    let binary_path = get_binary_dir_path(&board_arch);
+    let elf_bin_path = binary_path.join(DEFAULT_ELF_BIN_NAME);
+    let hex_bin_path = binary_path.join(DEFAULT_HEX_BIN_NAME);
+
+    match avr_objcopy::elf_to_hex(&elf_bin_path, &hex_bin_path) {
+        Ok(_) => {},
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return;
+        }
+    }
+
+    let device = match device::get_connected_device_list() {
+        Ok(mut ports) => {
+            match ports.pop() {
+                Some(p) => p,
+                None => {
+                    eprintln!("Error: No connected device to upload.");
+                    return;        
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return;
+        }
+    };
+    let upload_config = match boards::get_upload_config(&board.id) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("Error: {}",e);
+            return;
+        }
+    };
+    match avrdude::upload_binary(&hex_bin_path, &board.mcu, &upload_config.protocol, &device.port, &upload_config.speed) {
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return;
+        }
+    }
+}
+
+fn get_binary_dir_path(board_arch: &String) -> PathBuf {
+    PathBuf::from("target").join(board_arch).join("release")
 }
