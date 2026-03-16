@@ -5,19 +5,19 @@ use toml_edit::{DocumentMut, Item, Table, Array, value};
 const RUST_TOOLCHAIN_FILE_NAME: &str = "rust-toolchain.toml";
 
 
-pub fn create_toolchain_config(proj_path: &PathBuf) -> std::io::Result<()> {
+pub fn create_toolchain_config(proj_path: &PathBuf, rustc_version: &String) -> std::io::Result<()> {
     let file_path = PathBuf::from(proj_path).join(RUST_TOOLCHAIN_FILE_NAME);
     let mut toml = DocumentMut::new();
 
-    write_toolchain_init_content(&mut toml);
+    write_toolchain_init_content(&mut toml, rustc_version);
 
     fs::write(&file_path, toml.to_string())?;
     Ok(())
 }
 
-fn write_toolchain_init_content(toml: &mut DocumentMut) {
+fn write_toolchain_init_content(toml: &mut DocumentMut, rustc_version: &String) {
     let mut toolchain = Table::new();
-    toolchain["channel"] = value("nightly-2025-04-27");
+    toolchain["channel"] = value(rustc_version);
     let mut components = Array::new();
     components.push("rust-src");
     toolchain["components"] = value(components);

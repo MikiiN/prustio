@@ -52,7 +52,7 @@ pub fn create_prustio_config(
     let mut toml = DocumentMut::new();
     write_prustio_init_config(&mut toml, &project_name, &hybrid_mode);
 
-    if board_id != boards::UNSPECIFIED_BOARD_PARAM {
+    if board_id != boards::UNSPECIFIED_PARAM {
         add_prustio_config_env(&mut toml, board_id, &Vec::new(), board_id, framework);
     }
 
@@ -69,7 +69,7 @@ pub fn write_prustio_init_config(
     let mut package = Table::new();
     package["name"] = value(project_name);
     package["version"] = value("0.1.0");
-    package["mode"] = value(*hybrid_mode); 
+    package["hybrid_mode"] = value(*hybrid_mode); 
 
     toml["package"] = Item::Table(package);
 }

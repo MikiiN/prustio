@@ -38,27 +38,13 @@ pub fn init_project(
                     return;
                 }
             }
-        }
+        },
         None => boards::get_unspecified_board()
     };
 
-    let board_arch = match board.get_architecture() {
-        Some(arch) => arch,
-        None => {
-            eprintln!("Error: Unsupported board.");
-            return;
-        }
-    };
-    let board_feature_cargo = match board.get_cargo_feature() {
-        Some(feature) => feature,
-        None => {
-            eprintln!("Error: Unsupported board.");
-            return;
-        }
-    };
+    let board_arch = board.platform.to_cargo_arch();
 
-
-    match cargo_init(&proj_path, &board_arch, &board.mcu, &board_feature_cargo) {
+    match cargo_init(&proj_path, &board_arch, &board.mcu, &board.cargo_feature, &board.rustc_version) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -66,11 +52,12 @@ pub fn init_project(
         }
     }
 
+    // TODO - hardcoded
     let framework = if *hybrid {
-        Some(String::from("arduino"))
-    } else {
-        None
-    };
+            Some(String::from("arduino"))
+        } else {
+            None
+        };
     match prustio_init(&proj_path, &proj_name, hybrid, &board.id, &framework) {
         Ok(_) => (),
         Err(e) => {
@@ -87,6 +74,7 @@ fn cargo_init(
     board_arch: &String, 
     board_mcu: &String,
     cargo_feature: &String,
+    rustc_version: &String,
 ) -> Result<(), String> {
     match cargo::init_cargo(proj_path) {
         Ok(status) => {
@@ -99,19 +87,12 @@ fn cargo_init(
         }
     }
 
-    match toolchain_toml::create_toolchain_config(proj_path) {
+    match toolchain_toml::create_toolchain_config(proj_path, rustc_version) {
         Ok(_) => {},
         Err(_) => {
             return Err(String::from("Failed to create toolchain configuration file."));
         },
     }
-
-    match cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err(String::from("Failed to create cargo configuration."));
-        }
-    };
 
     match cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu) {
         Ok(_) => {},

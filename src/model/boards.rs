@@ -1,116 +1,216 @@
 use std::fs;
-
 use serde::Deserialize;
 
 use crate::wrapper::platformio;
 
-pub const UNSPECIFIED_BOARD_PARAM: &str = "UNSPECIFIED";
+pub const UNSPECIFIED_PARAM: &str = "UNSPECIFIED";
+const UNSPECIFIED_RUSTC_VERSION: &str = "nightly-2025-04-27";
 const PLATFORMS_DIR: &str = "platforms";
-const ATMELAVR_BOARDS_DIR: &str = "atmelavr/boards";
+const BOARDS_DIR: &str = "boards";
 
-#[derive(Debug, Deserialize, Clone)]
+pub enum Platform {
+    ATMELAVR,
+    UNKNOWN,
+}
+
+impl Platform {
+    pub fn from(value: &str) -> Platform {
+        match value {
+            "atmelavr" => Platform::ATMELAVR,
+            _ => Platform::UNKNOWN
+        }
+    }
+
+    pub fn to_string(&self) ->String {
+        match self {
+            Self::ATMELAVR => "atmelavr".to_string(),
+            Self::UNKNOWN => UNSPECIFIED_PARAM.to_string()
+        }
+    }
+
+    pub fn to_cargo_arch(&self) -> String {
+        match self {
+            Self::ATMELAVR => String::from("avr-none"),
+            Self::UNKNOWN => UNSPECIFIED_PARAM.to_string()
+        }
+    }
+}
+
 pub struct Board {
     pub id: String,
     pub mcu: String,
-    platform: String,
+    pub platform: Platform,
+    pub cargo_feature: String,
+    pub bus_speed: u32,
+    pub upload_protocol: String,
+    pub rustc_version: String,
 }
 
 impl Board {
-    pub fn new(id: String, mcu: String, platform: String) -> Board {
-        Board { id, mcu, platform }
+    pub fn new(
+        id: &str, 
+        cargo_feature: &str, 
+        rustc_version: &str,
+    ) -> Result<Board, String> {
+        let board = get_pio_board(id)?;
+        let upload_config = get_pio_upload_config(id, &board.platform)?;
+
+        Ok(Board {
+            id: String::from(id), 
+            mcu: board.mcu, 
+            platform: Platform::from(board.platform.as_str()), 
+            cargo_feature: String::from(cargo_feature), 
+            bus_speed: upload_config.speed, 
+            upload_protocol: upload_config.protocol, 
+            rustc_version: String::from(rustc_version)
+        })
     }
 
-    pub fn get_architecture(&self) -> Option<String> {
-        match self.platform.as_str() {
-            "atmelavr" => Some(String::from("avr-none")),
-            UNSPECIFIED_BOARD_PARAM => Some(String::from(UNSPECIFIED_BOARD_PARAM)),
-            _ => None,
-        }
-    }
-
-    pub fn get_cargo_feature(&self) -> Option<String> {
-        match self.id.as_str() {
-            "uno" => Some(String::from("arduino-uno")),
-            UNSPECIFIED_BOARD_PARAM => Some(String::from(UNSPECIFIED_BOARD_PARAM)),
-            _ => None,
+    pub fn new_custom(
+        id: &str, 
+        mcu: &str,
+        platform: &str,
+        cargo_feature: &str, 
+        bus_speed: &u32,
+        upload_protocol: &str,
+        rustc_version: &str,
+    ) -> Board {
+        Board {
+            id: String::from(id), 
+            mcu: String::from(mcu), 
+            platform: Platform::from(platform), 
+            cargo_feature: String::from(cargo_feature), 
+            bus_speed: bus_speed.clone(), 
+            upload_protocol: String::from(upload_protocol), 
+            rustc_version: String::from(rustc_version)
         }
     }
 }
 
+
+/*
+ ------------------------------- 
+    PIO board output parsing
+ ------------------------------- 
+*/
+
+#[derive(Debug, Deserialize, Clone)]
+struct PioBoard {
+    id: String,
+    mcu: String,
+    platform: String,
+}
+
+fn get_pio_board(id: &str) -> Result<PioBoard, String> {
+    match get_pio_boards(id) {
+        Ok(boards) => {
+            if boards.is_empty() {
+                return Err(String::from("Invalid board ID"));
+            }
+            let best_match = boards[0].clone();
+            if best_match.id == id {
+                return Ok(best_match);
+            }
+            return Err(String::from("Invalid board ID"));
+        },
+        Err(e) => { return Err(e) },
+    }
+}
+
+fn get_pio_boards(filter: &str) -> Result<Vec<PioBoard>, String> {
+    let result = platformio::get_boards(filter);
+    match result {
+        Ok(output) => {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            match serde_json::from_str::<Vec<PioBoard>>(&output_str) {
+                Ok(boards) => { return Ok(boards); },
+                Err(_) => { 
+                    return Err(String::from("Failed to parse JSON from platformIO.")); 
+                }
+            }
+        },
+        Err(_) => {
+            return Err(String::from("PlatformIO failed to find the specified board"));
+        }
+    }
+}
+
+/*
+ ------------------------------- 
+    PIO upload config parsing
+ ------------------------------- 
+*/
+
 #[derive(Deserialize, Debug)]
-struct BoardManifest {
+struct PioBoardManifest {
     name: String,
-    upload: UploadConfig,
-    build: Option<BuildConfig>,
+    upload: PioUploadConfig,
+    build: Option<PioBuildConfig>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct UploadConfig {
-    pub speed: u32, 
-    pub protocol: String,
+struct PioUploadConfig {
+    speed: u32, 
+    protocol: String,
 }
 
 #[derive(Deserialize, Debug)]
-struct BuildConfig {
+struct PioBuildConfig {
     mcu: Option<String>,
 }
 
-// TODO make general (now only support atmel AVR)
-pub fn get_upload_config(board_id: &String) -> Result<UploadConfig, String> {
+fn get_pio_upload_config(board_id: &str, platform: &str) -> Result<PioUploadConfig, String> {
     let (_, core_dir) = platformio::get_pio_dirs()?;
-    let confs_path = core_dir.join(PLATFORMS_DIR).join(ATMELAVR_BOARDS_DIR);
+    let confs_path = core_dir.join(PLATFORMS_DIR).join(platform).join(BOARDS_DIR);
     if !confs_path.exists() {
-        platformio::download_pio_platform("atmelavr")?;
+        platformio::download_pio_platform(platform)?;
     }
     
     let board_path = confs_path.join(format!("{board_id}.json"));
     if !board_path.exists() {
         return Err(String::from("Unknown board ID."));
     }
-    let file_contents = fs::read_to_string(&board_path)
-            .expect("Failed to read board JSON file");
+    let file_contents = match fs::read_to_string(&board_path) {
+        Ok(s) => s,
+        Err(_) => {
+            return Err(String::from("Failed to read configuration file."));
+        }
+    };
 
-    let manifest: BoardManifest = serde_json::from_str(&file_contents)
-            .expect("Failed to parse board JSON");
+    let manifest: PioBoardManifest = match serde_json::from_str(&file_contents) {
+        Ok(json) => json,
+        Err(_) => {
+            return Err(String::from("Failed to parse board configuration."));
+        }
+    };
+    
     Ok(manifest.upload)
 }
 
-pub fn get_board(id: &str) -> Result<Board, &str> {
-    match get_boards(id) {
-        Ok(boards) => {
-            if boards.is_empty() {
-                return Err("Invalid board ID");
-            }
-            let best_match = boards[0].clone();
-            if best_match.id == id {
-                return Ok(best_match);
-            }
-            return Err("Invalid board ID");
-        },
-        Err(e) => { return Err(e) },
-    }
-}
+/* 
+ -------------------------------
+    obtaining supported board
+ ------------------------------- 
+*/
 
-pub fn get_boards(filter: &str) -> Result<Vec<Board>, &str> {
-    let result = platformio::get_boards(filter);
-    match result {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            match serde_json::from_str::<Vec<Board>>(&output_str) {
-                Ok(boards) => { return Ok(boards); },
-                Err(_) => { return Err("Failed to parse JSON from platformIO."); }
-            }
-        },
-        Err(_) => {
-            return Err("PlatformIO failed to find the specified board");
+pub fn get_board(id: &str) -> Result<Board, String> {
+    let board = match id {
+        "uno" => Board::new(id, "arduino-uno", "nightly-2025-04-27")?,
+        _ => {
+            return Err("Unsupported board ID.".to_string());
         }
-    }
+    };
+    Ok(board)
 }
 
 pub fn get_unspecified_board() -> Board {
-    Board::new(
-        String::from(UNSPECIFIED_BOARD_PARAM),
-        String::from(UNSPECIFIED_BOARD_PARAM),
-        String::from(UNSPECIFIED_BOARD_PARAM)
+    Board::new_custom(
+        UNSPECIFIED_PARAM, 
+        UNSPECIFIED_PARAM, 
+        UNSPECIFIED_PARAM, 
+        UNSPECIFIED_PARAM, 
+        &0,
+        UNSPECIFIED_PARAM, 
+        UNSPECIFIED_RUSTC_VERSION, 
     )
 }

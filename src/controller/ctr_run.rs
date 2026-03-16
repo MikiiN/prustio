@@ -80,20 +80,7 @@ pub fn run(
             return;
         }
     };
-    let board_arch = match board.get_architecture() {
-        Some(arch) => arch,
-        None => {
-            eprintln!("Error: Unsupported board.");
-            return;
-        }
-    };
-    let board_feature_cargo = match board.get_cargo_feature() {
-        Some(feature) => feature,
-        None => {
-            eprintln!("Error: Unsupported board.");
-            return;
-        }
-    };
+    let board_arch = board.platform.to_cargo_arch();
 
     match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu) {
         Ok(_) => {},
@@ -103,7 +90,7 @@ pub fn run(
         }
     }
 
-    match cargo_toml::create_cargo_toml_config(&proj_path, &board_feature_cargo) {
+    match cargo_toml::create_cargo_toml_config(&proj_path, &board.cargo_feature) {
         Ok(_) => {},
         Err(_) => {
             eprintln!("Error: Failed to update project configuration");
@@ -145,14 +132,8 @@ pub fn run(
             return;
         }
     };
-    let upload_config = match boards::get_upload_config(&board.id) {
-        Ok(cfg) => cfg,
-        Err(e) => {
-            eprintln!("Error: {}",e);
-            return;
-        }
-    };
-    match avrdude::upload_binary(&hex_bin_path, &board.mcu, &upload_config.protocol, &device.port, &upload_config.speed) {
+
+    match avrdude::upload_binary(&hex_bin_path, &board.mcu, &board.upload_protocol, &device.port, &board.bus_speed) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error: {}", e);
