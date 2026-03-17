@@ -1,116 +1,118 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use toml_edit::{Array, DocumentMut, Item, Table, value};
+use toml_edit::{Array, DocumentMut, Item, Table, value, ser, Value};
 
 use crate::model::boards;
 
 const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct Env {
-    pub targets: Option<Vec<String>>,
-    pub board: Option<String>,
-    pub framework: Option<String>,
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Configuration {
+    package: Package,
+    env: Option<HashMap<String, Env>>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct GlobalEnv {
-    pub targets: Option<Vec<String>>,
-    pub board: Option<String>,
-    pub framework: Option<String>,
-
-    #[serde(flatten)]  
-    pub envs: HashMap<String, Env>,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Package {
+    name: String,
+    version: String,
+    hybrid_mode: bool
 }
 
-impl GlobalEnv {
-    pub fn to_env(&self) -> Env {
-        Env { 
-            targets: self.targets.clone(), 
-            board: self.board.clone(), 
-            framework: self.framework.clone() 
+impl Package {
+    pub fn new(name: &String, version: &String, hybrid_mode: &bool) -> Package {
+        Package { 
+            name: name.clone(), 
+            version: version.clone(), 
+            hybrid_mode: hybrid_mode.clone() 
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct Configuration {
-    env: GlobalEnv,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Env {
+    pub targets: Option<Vec<String>>,
+    pub board: String,
+    pub framework: Option<String>,
 }
+
+/*
+ -----------------------
+    Creating/Updating configuration
+ -----------------------
+*/
 
 pub fn create_prustio_config(
     proj_path: &PathBuf,
     project_name: &String,
     hybrid_mode: &bool,
     board_id: &String,
-    framework: &Option<String>,
-) -> std::io::Result<()> {
+    framework: Option<&String>,
+) -> Result<(), String> {
     let file = PathBuf::from(proj_path).join(PRUSTIO_CONFIG_FILE_NAME);
 
-    let mut toml = DocumentMut::new();
-    write_prustio_init_config(&mut toml, &project_name, &hybrid_mode);
+    // TODO
+    let content = Configuration {
+        package: Package::new(project_name, &"0.1.0".to_string(), hybrid_mode),
+        env: match board_id.as_str() {
+            boards::UNSPECIFIED_PARAM => None,
+            _ => {
+                let mut e = HashMap::new();
+                 let env = Env {
+                    board: board_id.clone(),
+                    targets: None,
+                    framework: framework.cloned()
+                }; 
+                e.insert(board_id.clone(), env);
+                Some(e)        
+            }
+        }
+    };
 
-    if board_id != boards::UNSPECIFIED_PARAM {
-        add_prustio_config_env(&mut toml, board_id, &Vec::new(), board_id, framework);
+    let mut doc = match ser::to_document(&content) {
+            Ok(res) => res,
+            Err(_) => {
+                return Err("Failed to serialize configuration.".to_string());
+            }
+        };
+
+    if let Item::Value(Value::InlineTable(inline)) = &doc["package"] {
+        doc["package"] = Item::Table(inline.clone().into_table());
     }
 
-    fs::write(&file, toml.to_string())?;
+    if board_id != boards::UNSPECIFIED_PARAM {
+        if let Item::Value(Value::InlineTable(inline)) = &doc["env"] {
+            let mut env_table = inline.clone().into_table();
+            env_table.set_implicit(true);
+    
+            if let Item::Value(Value::InlineTable(uno_inline)) = &env_table[board_id] {
+                env_table[board_id] = Item::Table(uno_inline.clone().into_table());
+            }
+    
+            doc["env"] = Item::Table(env_table);
+        }
+    }
+
+    match fs::write(&file, doc.to_string()) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to write configuration.".to_string());
+        }
+    };
 
     Ok(())
 }
 
-pub fn write_prustio_init_config(
-    toml: &mut DocumentMut, 
-    project_name: &String, 
-    hybrid_mode: &bool
-) {
-    let mut package = Table::new();
-    package["name"] = value(project_name);
-    package["version"] = value("0.1.0");
-    package["hybrid_mode"] = value(*hybrid_mode); 
+/*
+ ---------------------------
+    Reading configuration
+ ---------------------------
+*/
 
-    toml["package"] = Item::Table(package);
-}
-
-pub fn add_prustio_config_env(
-    toml: &mut DocumentMut,
-    env_name: &String,
-    env_targets: &Vec<String>,
-    // env_platform: &String,
-    env_board: &String,
-    env_framework: &Option<String>,
-) {
-    let mut env = Table::new();
-    if !env_targets.is_empty() {
-        let mut targets = Array::new();
-        for t in env_targets {
-            targets.push(t.clone());
-        }
-        env["targets"] = value(targets);
-    }
-
-    // env["platform"] = value(env_platform);
-    env["board"] = value(env_board);
-    match env_framework {
-        Some(f) => env["framework"] = value(f),
-        None => (),
-    };
-    
-    if let Some(t) = toml.get("env") {
-        if !t.is_table() {
-            // TODO
-            println!("Error: env is invalid element");
-        }
-    }
-    else {
-        toml["env"] = Item::Table(Table::new());
-    }
-    toml["env"][env_name] = Item::Table(env);
-}
-
-pub fn get_env(proj_path: &PathBuf) -> Result<GlobalEnv, String> {
+pub fn get_env(proj_path: &PathBuf) -> Result<HashMap<String, Env>, String> {
     let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
     if !config_file.exists() {
         return Err(String::from("Missing PrustIO configuration file."));
@@ -130,6 +132,8 @@ pub fn get_env(proj_path: &PathBuf) -> Result<GlobalEnv, String> {
             return Err(String::from("Failed to parse PrustIO configuration file."));
         }
     };
-
-    return Ok(config.env);
+    match config.env {
+        Some(env) => Ok(env),
+        None => Ok(HashMap::new())
+    }
 }

@@ -54,11 +54,11 @@ pub fn init_project(
 
     // TODO - hardcoded
     let framework = if *hybrid {
-            Some(String::from("arduino"))
+            Some(&String::from("arduino"))
         } else {
             None
         };
-    match prustio_init(&proj_path, &proj_name, hybrid, &board.id, &framework) {
+    match prustio_init(&proj_path, &proj_name, hybrid, &board.id, framework) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -123,7 +123,7 @@ fn prustio_init(
     proj_name: &String, 
     hybrid: &bool,
     board_id: &String,
-    framework: &Option<String>,
+    framework: Option<&String>,
 ) -> Result<(), String> {
     match prustio_config::create_prustio_config(proj_path, proj_name, hybrid, board_id, framework) {
         Ok(_) => {},

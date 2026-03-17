@@ -1,4 +1,5 @@
 use std::env;
+use std::f64::consts::E;
 use std::path::PathBuf;
 
 use crate::model::{boards, cargo_config_toml, cargo_toml, prustio_config, device};
@@ -25,7 +26,7 @@ pub fn run(
         return;
     }
 
-    let config = match prustio_config::get_env(&proj_path) {
+    let envs = match prustio_config::get_env(&proj_path) {
         Ok(val) => val,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -35,15 +36,16 @@ pub fn run(
 
     let env = match environment {
         Some(e) => {
-            if config.envs.contains_key(e) {
-                config.envs[e].clone()
+            if envs.contains_key(e) {
+                envs[e].clone()
             } else {
                 eprintln!("Error: Invalid environment name.");
                 return;
             }
         },
         None => {
-            config.to_env()
+            let e = "uno".to_string();
+            envs[&e].clone()
         }
     };
 
@@ -65,18 +67,10 @@ pub fn run(
         }
     };
 
-    let board = match env.board {
-        Some(id) => {
-            match boards::get_board(&id) {
-                Ok(b) => b,
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    return;
-                }
-            }
-        }
-        None => {
-            eprintln!("Error: Unsupported board.");
+    let board = match boards::get_board(&env.board) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("Error: {}", e);
             return;
         }
     };
