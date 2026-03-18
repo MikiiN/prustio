@@ -62,16 +62,16 @@ pub fn run(
 
     match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu) {
         Ok(_) => {},
-        Err(_) => {
-            eprintln!("Error: Failed to update project configuration");
+        Err(e) => {
+            eprintln!("Error: {}", e);
             return;
         }
     }
 
     match cargo_toml::create_cargo_toml_config(&proj_path, &board.cargo_feature) {
         Ok(_) => {},
-        Err(_) => {
-            eprintln!("Error: Failed to update project configuration");
+        Err(e) => {
+            eprintln!("Error: {}", e);
             return;
         }
     }

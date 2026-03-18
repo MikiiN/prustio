@@ -6,14 +6,29 @@ const CARGO_TOML_FILE_NAME: &str = "Cargo.toml";
 const DEFAULT_BIN_NAME: &str = "bin";
 const DEFAULT_MAIN_PATH: &str = "src/main.rs";
 
-pub fn create_cargo_toml_config(proj_path: &PathBuf, board_feature: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_cargo_toml_config(proj_path: &PathBuf, board_feature: &str) -> Result<(), String> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
-    let cargo_content = fs::read_to_string(&file_path)?;
-    let mut toml = cargo_content.parse::<DocumentMut>()?;
+    let cargo_content = match fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err("Failed to read Cargo.toml file.".to_string());
+        }
+    };
+    let mut toml = match cargo_content.parse::<DocumentMut>() {
+        Ok(t) => t,
+        Err(_) => {
+            return Err("Failed to parse Cargo.toml file.".to_string());
+        }
+    };
 
     write_cargo_toml_content(&mut toml, board_feature);
 
-    fs::write(&file_path, toml.to_string())?;
+    match fs::write(&file_path, toml.to_string()) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to write updated Cargo.toml file.".to_string());
+        }
+    };
     Ok(())
 }
 

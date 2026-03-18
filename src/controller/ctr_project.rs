@@ -76,44 +76,15 @@ fn cargo_init(
     cargo_feature: &String,
     rustc_version: &String,
 ) -> Result<(), String> {
-    match cargo::init_cargo(proj_path) {
-        Ok(status) => {
-            if !status.success() {
-                return Err(format!("Cargo init failed with code: {status}"));
-            }
-        },
-        Err(e) => {
-            return Err(format!("Failed to execute the cargo command:\n {e}"));
-        }
-    }
+    cargo::init_cargo(proj_path)?;
 
-    match toolchain_toml::create_toolchain_config(proj_path, rustc_version) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err(String::from("Failed to create toolchain configuration file."));
-        },
-    }
+    toolchain_toml::create_toolchain_config(proj_path, rustc_version)?;
 
-    match cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err(String::from("Failed to create cargo configuration."));
-        }
-    };
+    cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu)?;
 
-    match cargo_toml::create_cargo_toml_config(proj_path, cargo_feature) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err(String::from("Failed to create cargo configuration."));
-        }
-    }
+    cargo_toml::create_cargo_toml_config(proj_path, cargo_feature)?;
 
-    match source_code::write_example_code(proj_path) {
-        Ok(_) => {},
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    source_code::write_example_code(proj_path)?;
 
     Ok(())
 }
@@ -125,11 +96,6 @@ fn prustio_init(
     board_id: &String,
     framework: Option<&String>,
 ) -> Result<(), String> {
-    match prustio_config::create_prustio_config(proj_path, proj_name, hybrid, board_id, framework) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err(String::from("Failed to create PrustIO configuration file."));
-        },
-    };
+    prustio_config::create_prustio_config(proj_path, proj_name, hybrid, board_id, framework)?;
     Ok(())
 }

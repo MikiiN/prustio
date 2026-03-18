@@ -2,8 +2,6 @@ use std::io::Error;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
-use clap::builder::Str;
-
 use crate::utils::{
     ensure_dir_existence,
     get_app_dir,

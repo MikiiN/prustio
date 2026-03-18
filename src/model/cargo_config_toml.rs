@@ -10,16 +10,26 @@ pub fn create_cargo_config(
     proj_path: &PathBuf,
     target_architecture: &String,
     target_mcu: &String,
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     let dir_path: PathBuf = proj_path.join(CONFIGURATION_DIR_NAME);
-    fs::create_dir_all(&dir_path)?;
+    match fs::create_dir_all(&dir_path) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to create .cargo folder.".to_string());
+        }
+    };
 
     let file_path = dir_path.join(CONFIGURATION_FILE_NAME);
     let mut toml = DocumentMut::new();
 
     write_config_toml_content(&mut toml, target_architecture, target_mcu);
     
-    fs::write(file_path, toml.to_string())?;
+    match fs::write(file_path, toml.to_string()) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to write config.toml configuration.".to_string());
+        }
+    };
     Ok(())
 }
 
@@ -27,14 +37,19 @@ pub fn update_cargo_config(
     proj_path: &PathBuf,
     target_architecture: &String,
     target_mcu: &String,
-) -> std::io::Result<()> {
+) -> Result<(), String> {
     let file_path = proj_path
         .join(CONFIGURATION_DIR_NAME)
         .join(CONFIGURATION_FILE_NAME);
     if !file_path.exists() {
         return create_cargo_config(proj_path, target_architecture, target_mcu);
     }
-    let content = fs::read_to_string(&file_path)?;
+    let content = match fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err("Failed to read config.toml content.".to_string());
+        }
+    };
     let mut toml = match content.parse::<DocumentMut>() {
         Ok(t) => t,
         Err(_) => {
@@ -44,7 +59,12 @@ pub fn update_cargo_config(
     };
 
     write_cargo_toml_target(&mut toml, target_architecture, target_mcu);
-    fs::write(&file_path, toml.to_string())?;
+    match fs::write(&file_path, toml.to_string()) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to write updated configuration to config.toml.".to_string());
+        }
+    };
     Ok(())
 }
 

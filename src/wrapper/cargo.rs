@@ -1,18 +1,29 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio, ExitStatus};
 
-pub fn init_cargo(proj_path: &PathBuf) -> std::io::Result<ExitStatus> {
+pub fn init_cargo(proj_path: &PathBuf) -> Result<(), String> {
     let mut cmd = Command::new("cargo");
     cmd.arg("init").arg(proj_path);
 
-    let status = cmd
+    let output = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .status();
-    return status;
+        .output();
+    
+    match output {
+        Ok(output) => {
+            if !output.status.success() {
+                return Err(String::from("Tool cargo failed."));
+            }
+        },
+        Err(_) => {
+            return Err(String::from("Failed to run cargo tool."));
+        }
+    }
+    Ok(())
 }
 
-pub fn cargo_build(proj_path: &PathBuf, target: &Option<String>) -> std::io::Result<ExitStatus> {
+pub fn cargo_build(proj_path: &PathBuf, target: &Option<String>) -> Result<(), String>  {
     let mut cmd = Command::new("cargo");
     cmd.current_dir(proj_path)
         .args(["build", "--release"]);
@@ -23,9 +34,20 @@ pub fn cargo_build(proj_path: &PathBuf, target: &Option<String>) -> std::io::Res
         None => {}
     };
 
-    let status = cmd
+    let output = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .status();
-    return status;
+        .output();
+    
+     match output {
+        Ok(output) => {
+            if !output.status.success() {
+                return Err(String::from("Tool avr-objcopy failed."));
+            }
+        },
+        Err(_) => {
+            return Err(String::from("Failed to run avr-objcopy tool."));
+        }
+    }
+    Ok(())
 }

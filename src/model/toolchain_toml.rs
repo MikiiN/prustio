@@ -5,13 +5,18 @@ use toml_edit::{DocumentMut, Item, Table, Array, value};
 const RUST_TOOLCHAIN_FILE_NAME: &str = "rust-toolchain.toml";
 
 
-pub fn create_toolchain_config(proj_path: &PathBuf, rustc_version: &String) -> std::io::Result<()> {
+pub fn create_toolchain_config(proj_path: &PathBuf, rustc_version: &String) -> Result<(), String> {
     let file_path = PathBuf::from(proj_path).join(RUST_TOOLCHAIN_FILE_NAME);
     let mut toml = DocumentMut::new();
 
     write_toolchain_init_content(&mut toml, rustc_version);
 
-    fs::write(&file_path, toml.to_string())?;
+    match fs::write(&file_path, toml.to_string()) {
+        Ok(_) => {},
+        Err(_) => {
+            return Err("Failed to write rust-toolchain.toml configuration.".to_string());
+        } 
+    };
     Ok(())
 }
 
