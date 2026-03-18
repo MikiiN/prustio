@@ -52,7 +52,7 @@ fn run_command(cli: &ui::Cli) {
             },
         },
         ui::TopLevelCommands::Run {target, environment, json_output} => {
-            ctr_run::run(target, environment, json_output);
+            ctr_run::run(target, environment.as_ref(), json_output);
         },
     }
 }

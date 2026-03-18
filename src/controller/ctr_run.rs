@@ -1,5 +1,4 @@
 use std::env;
-use std::f64::consts::E;
 use std::path::PathBuf;
 
 use crate::model::{boards, cargo_config_toml, cargo_toml, prustio_config, device};
@@ -11,7 +10,7 @@ const DEFAULT_HEX_BIN_NAME: &str = "bin.hex";
 
 pub fn run(
     target: &Option<String>,
-    environment: &Option<String>,
+    environment: Option<&String>,
     json_output: &bool,
 ) {
     let proj_path = match env::current_dir() {
@@ -26,26 +25,11 @@ pub fn run(
         return;
     }
 
-    let envs = match prustio_config::get_env(&proj_path) {
-        Ok(val) => val,
-        Err(e) => {
-            eprintln!("Error: {}", e);
+    let env = match prustio_config::get_env(&proj_path, environment) {
+        Ok(e) => e,
+        Err(err) => {
+            eprintln!("Error: {}", err);
             return;
-        }
-    };
-
-    let env = match environment {
-        Some(e) => {
-            if envs.contains_key(e) {
-                envs[e].clone()
-            } else {
-                eprintln!("Error: Invalid environment name.");
-                return;
-            }
-        },
-        None => {
-            let e = "uno".to_string();
-            envs[&e].clone()
         }
     };
 
