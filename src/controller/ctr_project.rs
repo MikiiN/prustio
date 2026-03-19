@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::wrapper::cargo;
 use crate::model::{
-    boards, 
+    board, 
     cargo_config_toml,
     cargo_toml, 
     prustio_config, 
@@ -31,7 +31,7 @@ pub fn init_project(
 
     let board = match board_id {
         Some(id) => {
-            match boards::get_board(id) {
+            match board::get_board(id) {
                 Ok(b) => b,
                 Err(e) => {
                     eprintln!("Error: {}", e);
@@ -39,7 +39,7 @@ pub fn init_project(
                 }
             }
         },
-        None => boards::get_unspecified_board()
+        None => board::get_unspecified_board()
     };
 
     let board_arch = board.platform.to_cargo_arch();

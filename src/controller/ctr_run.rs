@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use crate::model::{boards, cargo_config_toml, cargo_toml, prustio_config, device};
+use crate::model::{board, cargo_config_toml, cargo_toml, prustio_config, device};
 use crate::utils;
 use crate::wrapper::{cargo, avr_objcopy, avrdude};
 
@@ -51,7 +51,7 @@ pub fn run(
         }
     };
 
-    let board = match boards::get_board(&env.board) {
+    let board = match board::get_board(&env.board) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("Error: {}", e);

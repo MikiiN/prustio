@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::model::boards::UNSPECIFIED_PARAM;
+use crate::model::board::UNSPECIFIED_PARAM;
 
 
 const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";

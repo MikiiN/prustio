@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 
-pub mod project;
 pub mod device;
+pub mod display;
+pub mod project;
 
 #[derive(Parser)]
 #[command(name = "PrustIO")]
@@ -32,13 +33,27 @@ pub enum TopLevelCommands {
         command: project::ProjectCommands,
     },
     
-    // Run targets
+    // Run targets and envs
     Run {
         #[arg(short, long)]
         target: Option<String>,
         #[arg(short, long)]
         environment: Option<String>,
 
+        #[arg(long)]
+        json_output: bool,
+    },
+
+    // for choosing current environment
+    Activate {
+        environment: String,
+
+        #[arg(long)]
+        json_output: bool,
+    },
+
+    // refreshing project configuration
+    Refresh {
         #[arg(long)]
         json_output: bool,
     }

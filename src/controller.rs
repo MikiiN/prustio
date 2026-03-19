@@ -5,6 +5,7 @@ use crate::ui::device::DeviceCommands;
 use crate::ui::project::ProjectCommands;
 use crate::wrapper::platformio;
 
+mod ctr_board;
 mod ctr_project;
 mod ctr_run;
 
@@ -27,14 +28,15 @@ pub fn execute() {
 fn run_command(cli: &ui::Cli) {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
-            let _ = filter; 
-            let _ = json_output;
+            ctr_board::board(filter.as_ref(), json_output);
         },
+
         ui::TopLevelCommands::Device { command } => match command {
             DeviceCommands::List { json_output } => {
                 let _ = json_output;
             },
         },
+
         ui::TopLevelCommands::Project { command } => match command {
             ProjectCommands::Add { package, json_output } => {
                 let _ = package;
@@ -51,8 +53,18 @@ fn run_command(cli: &ui::Cli) {
                 let _ = json_output;
             },
         },
+
         ui::TopLevelCommands::Run {target, environment, json_output} => {
             ctr_run::run(target, environment.as_ref(), json_output);
+        },
+
+        ui::TopLevelCommands::Activate { environment, json_output } => {
+            let _ = environment;
+            let _ = json_output;
+        },
+
+        ui::TopLevelCommands::Refresh { json_output } => {
+            let _ = json_output;
         },
     }
 }

@@ -1,4 +1,4 @@
-pub mod boards;
+pub mod board;
 pub mod cargo_config_toml;
 pub mod cargo_toml;
 pub mod device;
