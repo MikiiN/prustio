@@ -6,6 +6,7 @@ use crate::ui::project::ProjectCommands;
 use crate::wrapper::platformio;
 
 mod ctr_board;
+mod ctr_device;
 mod ctr_project;
 mod ctr_run;
 
@@ -33,8 +34,11 @@ fn run_command(cli: &ui::Cli) {
 
         ui::TopLevelCommands::Device { command } => match command {
             DeviceCommands::List { json_output } => {
-                let _ = json_output;
+                ctr_device::device_list(json_output);
             },
+            DeviceCommands::Monitor { port } => {
+                let _ = port;
+            }
         },
 
         ui::TopLevelCommands::Project { command } => match command {

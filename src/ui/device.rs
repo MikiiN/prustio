@@ -6,5 +6,9 @@ pub enum DeviceCommands {
     List {
         #[arg(long)]
         json_output: bool,
+    },
+
+    Monitor {
+        port: String,
     }
 }

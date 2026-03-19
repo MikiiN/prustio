@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer};
+use serde::ser::{SerializeStruct, Serialize, Serializer};
 
 use crate::wrapper::platformio;
 
@@ -10,6 +11,28 @@ pub struct PioDevice {
 
     #[serde(deserialize_with = "parse_input", default)]
     pub hwid: Option<String>,
+}
+
+impl Serialize for PioDevice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hwid = match &self.hwid {
+            Some(id) => id.as_str(),
+            None => "n/a",
+        };
+        let description = match &self.description {
+            Some(d) => d.as_str(),
+            None => "n/a",
+        };
+
+        let mut state = serializer.serialize_struct("PioDevice", 3)?;
+        state.serialize_field("port", &self.port)?;
+        state.serialize_field("hwid", &hwid)?;
+        state.serialize_field("description", description)?;
+        state.end()
+    }
 }
 
 pub fn get_connected_device_list() -> Result<Vec<PioDevice>, String> {
