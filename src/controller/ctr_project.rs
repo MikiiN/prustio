@@ -78,7 +78,7 @@ fn cargo_init(
 ) -> Result<(), String> {
     cargo::init_cargo(proj_path)?;
 
-    toolchain_toml::create_toolchain_config(proj_path, rustc_version)?;
+    toolchain_toml::create_toolchain_config(proj_path, rustc_version, &None, &None)?;
 
     cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu)?;
 
