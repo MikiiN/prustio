@@ -1,9 +1,70 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use toml_edit::{DocumentMut, Item, Table, Array, value};
 
 const CONFIGURATION_DIR_NAME: &str = ".cargo";
 const CONFIGURATION_FILE_NAME: &str = "config.toml";
+
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CargoConfigToml {
+    build: CargoConfigBuild,
+    unstable: CargoConfigUnstable,
+}
+
+impl CargoConfigToml {
+    pub fn new(
+        target_architecture: &String,
+        target_mcu: &String,
+    ) -> CargoConfigToml {
+        CargoConfigToml { 
+            build: CargoConfigBuild { 
+                target: target_architecture.to_ascii_lowercase(), 
+                rustflags: Vec::from([
+                    "-C".to_string(),
+                    format!("target-cpu={}", target_mcu.to_ascii_lowercase())
+                ]) 
+            }, 
+            unstable: CargoConfigUnstable {
+                build_std: Vec::from(["core".to_string()]),
+            } 
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        target_architecture: Option<&String>,
+        target_mcu: Option<&String>,
+    ) {
+        match target_architecture {
+            Some(arch) => {
+                self.build.target = arch.to_ascii_lowercase();
+            },
+            None => {}
+        };
+
+        match target_mcu {
+            Some(mcu) => {
+                self.build.rustflags = Vec::from([
+                    "-C".to_string(),
+                    format!("target-cpu={}", mcu.to_ascii_lowercase())
+                ]) 
+            },
+            None => {}
+        };
+    } 
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CargoConfigBuild {
+    target: String,
+    rustflags: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CargoConfigUnstable {
+    build_std: Vec<String>,
+}
 
 
 pub fn create_cargo_config(
@@ -20,11 +81,16 @@ pub fn create_cargo_config(
     };
 
     let file_path = dir_path.join(CONFIGURATION_FILE_NAME);
-    let mut toml = DocumentMut::new();
-
-    write_config_toml_content(&mut toml, target_architecture, target_mcu);
     
-    match fs::write(file_path, toml.to_string()) {
+    let config = CargoConfigToml::new(target_architecture, target_mcu);
+    let content = match toml::to_string_pretty(&config) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err("Failed to parse content for .cargo/config.toml.".to_string());
+        }
+    };
+
+    match fs::write(file_path, &content) {
         Ok(_) => {},
         Err(_) => {
             return Err("Failed to write config.toml configuration.".to_string());
@@ -50,51 +116,27 @@ pub fn update_cargo_config(
             return Err("Failed to read config.toml content.".to_string());
         }
     };
-    let mut toml = match content.parse::<DocumentMut>() {
-        Ok(t) => t,
+    let mut config: CargoConfigToml = match toml::de::from_str(&content) {
+        Ok(c) => c,
         Err(_) => {
-            // TODO handle errors
-            return Ok(());
+            return create_cargo_config(proj_path, target_architecture, target_mcu);
+        }
+    }; 
+
+    config.update(Some(target_architecture), Some(target_mcu));
+
+    let content = match toml::to_string_pretty(&config) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err("Failed to parse config.toml content.".to_string());
         }
     };
 
-    write_cargo_toml_target(&mut toml, target_architecture, target_mcu);
-    match fs::write(&file_path, toml.to_string()) {
+    match fs::write(&file_path, content) {
         Ok(_) => {},
         Err(_) => {
             return Err("Failed to write updated configuration to config.toml.".to_string());
         }
     };
     Ok(())
-}
-
-fn write_config_toml_content(
-    toml: &mut DocumentMut,
-    target_architecture: &String,
-    target_mcu: &String,
-) {
-    write_cargo_toml_target(toml, target_architecture, target_mcu);
-
-    let mut unstable = Table::new();
-    let mut builds = Array::new();
-    builds.push("core");
-    unstable["build-std"] = value(builds);
-    toml["unstable"] = Item::Table(unstable);
-}
-
-fn write_cargo_toml_target(
-    toml: &mut DocumentMut,
-    target_architecture: &String,
-    target_mcu: &String,
-) {
-    let arch = target_architecture.to_ascii_lowercase();
-    let mcu = target_mcu.to_ascii_lowercase();
-
-    let mut build = Table::new();
-    build["target"] = value(arch);
-    let mut flags = Array::new();
-    flags.push("-C");
-    flags.push(format!("target-cpu={mcu}").as_str());
-    build["rustflags"] = value(flags);
-    toml["build"] = Item::Table(build);
 }
