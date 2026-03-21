@@ -25,6 +25,14 @@ pub fn run(
         return;
     }
 
+    let package = match prustio_config::get_package_information(&proj_path) {
+        Ok(p) => p,
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            return;
+        }
+    };
+
     let env = match prustio_config::get_env(&proj_path, environment) {
         Ok(e) => e,
         Err(err) => {
@@ -68,7 +76,7 @@ pub fn run(
         }
     }
 
-    match cargo_toml::create_cargo_toml_config(&proj_path, &board.cargo_feature) {
+    match cargo_toml::create_cargo_toml_config(&proj_path, &package.name, &board.cargo_feature) {
         Ok(_) => {},
         Err(e) => {
             eprintln!("Error: {}", e);

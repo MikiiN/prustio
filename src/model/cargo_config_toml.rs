@@ -63,6 +63,7 @@ pub struct CargoConfigBuild {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CargoConfigUnstable {
+    #[serde(rename = "build-std")]
     build_std: Vec<String>,
 }
 

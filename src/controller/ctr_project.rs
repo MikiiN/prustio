@@ -44,7 +44,7 @@ pub fn init_project(
 
     let board_arch = board.platform.to_cargo_arch();
 
-    match cargo_init(&proj_path, &board_arch, &board.mcu, &board.cargo_feature, &board.rustc_version) {
+    match cargo_init(&proj_path, proj_name, &board_arch, &board.mcu, &board.cargo_feature, &board.rustc_version) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -70,7 +70,8 @@ pub fn init_project(
 }
 
 fn cargo_init(
-    proj_path: &PathBuf, 
+    proj_path: &PathBuf,
+    proj_name: &String, 
     board_arch: &String, 
     board_mcu: &String,
     cargo_feature: &String,
@@ -82,7 +83,7 @@ fn cargo_init(
 
     cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu)?;
 
-    cargo_toml::create_cargo_toml_config(proj_path, cargo_feature)?;
+    cargo_toml::create_cargo_toml_config(proj_path, proj_name,cargo_feature)?;
 
     source_code::write_example_code(proj_path)?;
 

@@ -17,7 +17,7 @@ pub struct Configuration {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
-    name: String,
+    pub name: String,
     version: String,
     hybrid_mode: bool
 }
@@ -141,26 +141,43 @@ pub fn get_env(proj_path: &PathBuf, env_name: Option<&String>) -> Result<Env, St
 
 pub fn get_envs(proj_path: &PathBuf) -> Result<BTreeMap<String, Env>, String> {
     let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
-    if !config_file.exists() {
-        return Err(String::from("Missing PrustIO configuration file."));
-    }
-
-    let content = match fs::read_to_string(&config_file) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(String::from("Failed to read PrustIO configuration file."));
-        },
-    };
+    
+    let content = read_prustio_config(&config_file)?;
     
     let config: Configuration = match toml_edit::de::from_str(&content) {
         Ok(c) => c,
-        Err(e) => {
-            println!("Error: {:?}",e);
+        Err(_) => {
             return Err(String::from("Failed to parse PrustIO configuration file."));
         }
     };
     match config.env {
         Some(env) => Ok(env),
         None => Ok(BTreeMap::new())
+    }
+}
+
+pub fn get_package_information(proj_path: &PathBuf) -> Result<Package, String> {
+    let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
+    
+    let content = read_prustio_config(&config_file)?;
+
+    let config: Configuration = match toml_edit::de::from_str(&content) {
+        Ok(c) => c,
+        Err(_) => {
+            return Err(String::from("Failed to parse PrustIO configuration file."));
+        }
+    };
+
+    Ok(config.package)
+}
+
+fn read_prustio_config(file_path: &PathBuf) -> Result<String, String> {
+    if !file_path.exists() {
+        return Err(String::from("Missing PrustIO configuration file."));
+    }
+
+    match fs::read_to_string(&file_path) {
+        Ok(c) => Ok(c),
+        Err(_) => Err(String::from("Failed to read PrustIO configuration file.")),
     }
 }

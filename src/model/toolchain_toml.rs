@@ -6,6 +6,11 @@ const RUST_TOOLCHAIN_FILE_NAME: &str = "rust-toolchain.toml";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ToolchainConfiguration {
+    toolchain: Toolchain
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Toolchain {
     pub channel: String,
     pub components: Vec<String>,
     pub profile: String,
@@ -18,9 +23,11 @@ impl ToolchainConfiguration {
         profile: &String
     ) -> ToolchainConfiguration {
         ToolchainConfiguration { 
-            channel: channel.clone(), 
-            components: components.clone(), 
-            profile: profile.clone(), 
+                toolchain: Toolchain { 
+                channel: channel.clone(), 
+                components: components.clone(), 
+                profile: profile.clone(),
+            } 
         }
     }
 
@@ -92,16 +99,16 @@ pub fn update_toolchain_config(
         }
     };
 
-    parsed_config.channel = rustc_version.clone();
+    parsed_config.toolchain.channel = rustc_version.clone();
     match components {
         Some(c) => {
-            parsed_config.components = c.clone();
+            parsed_config.toolchain.components = c.clone();
         },
         None => {}
     }
     match profile {
         Some(p) => {
-            parsed_config.profile = p.clone();
+            parsed_config.toolchain.profile = p.clone();
         },
         None => {}
     }
