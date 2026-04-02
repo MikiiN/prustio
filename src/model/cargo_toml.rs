@@ -97,8 +97,8 @@ pub struct BinConfig {
 impl BinConfig {
     pub fn new() -> BinConfig {
         BinConfig {
-            name: "bin".to_string(),
-            path: "src/main.rs".to_string(),
+            name: DEFAULT_BIN_NAME.to_string(),
+            path: DEFAULT_MAIN_PATH.to_string(),
             test: false,
             bench: false,
         }

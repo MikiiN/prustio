@@ -68,7 +68,7 @@ pub fn run(
     };
     let board_arch = board.platform.to_cargo_arch();
 
-    match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu) {
+    match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, None) {
         Ok(_) => {},
         Err(e) => {
             eprintln!("Error: {}", e);

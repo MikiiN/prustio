@@ -121,14 +121,15 @@ pub fn get_devices() -> Result<Vec<u8>, String> {
     Ok(output.stdout)
 }
 
-// TODO move getting directories to here (less parameters)
+pub fn compile_c_libraries(project_dir: &PathBuf) {
+    
+}
+
 fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str]) -> Result<Output, Error> {
     let pio_path = get_venv_executable(venv_dir, "pio");
 
-    let output = Command::new(pio_path)
+    Command::new(pio_path)
         .env("PLATFORMIO_CORE_DIR", core_dir) 
         .args(pio_args)
-        .output();
-
-    return output;
+        .output()
 }

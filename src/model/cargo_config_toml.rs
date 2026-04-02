@@ -16,15 +16,10 @@ impl CargoConfigToml {
     pub fn new(
         target_architecture: &String,
         target_mcu: &String,
+        linker: Option<&String>,
     ) -> CargoConfigToml {
         CargoConfigToml { 
-            build: CargoConfigBuild { 
-                target: target_architecture.to_ascii_lowercase(), 
-                rustflags: Vec::from([
-                    "-C".to_string(),
-                    format!("target-cpu={}", target_mcu.to_ascii_lowercase())
-                ]) 
-            }, 
+            build: CargoConfigBuild::new(target_architecture, target_mcu, linker), 
             unstable: CargoConfigUnstable {
                 build_std: Vec::from(["core".to_string()]),
             } 
@@ -35,6 +30,7 @@ impl CargoConfigToml {
         &mut self,
         target_architecture: Option<&String>,
         target_mcu: Option<&String>,
+        linker: Option<&String>,
     ) {
         match target_architecture {
             Some(arch) => {
@@ -42,6 +38,13 @@ impl CargoConfigToml {
             },
             None => {}
         };
+
+        match linker {
+            Some(l) => {
+                self.build.linker = Some(l.clone());
+            },
+            None => {}
+        }
 
         match target_mcu {
             Some(mcu) => {
@@ -58,7 +61,23 @@ impl CargoConfigToml {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CargoConfigBuild {
     target: String,
+    linker: Option<String>,
     rustflags: Vec<String>,
+}
+
+impl CargoConfigBuild {
+    fn new(target_architecture: &String, target_mcu: &String, linker: Option<&String>) -> CargoConfigBuild {
+        let arch = target_architecture.to_ascii_lowercase();
+        let mcu = target_mcu.to_ascii_lowercase();
+        CargoConfigBuild { 
+            target: arch, 
+            linker: linker.cloned(), 
+            rustflags: Vec::from([
+                "-C".to_string(),
+                format!("target-cpu={}", mcu)
+            ]) 
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -83,7 +102,7 @@ pub fn create_cargo_config(
 
     let file_path = dir_path.join(CONFIGURATION_FILE_NAME);
     
-    let config = CargoConfigToml::new(target_architecture, target_mcu);
+    let config = CargoConfigToml::new(target_architecture, target_mcu, None);
     let content = match toml::to_string_pretty(&config) {
         Ok(c) => c,
         Err(_) => {
@@ -104,6 +123,7 @@ pub fn update_cargo_config(
     proj_path: &PathBuf,
     target_architecture: &String,
     target_mcu: &String,
+    linker: Option<&String>,
 ) -> Result<(), String> {
     let file_path = proj_path
         .join(CONFIGURATION_DIR_NAME)
@@ -124,7 +144,7 @@ pub fn update_cargo_config(
         }
     }; 
 
-    config.update(Some(target_architecture), Some(target_mcu));
+    config.update(Some(target_architecture), Some(target_mcu), linker);
 
     let content = match toml::to_string_pretty(&config) {
         Ok(c) => c,
