@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -9,6 +10,7 @@ const CONFIGURATION_FILE_NAME: &str = "config.toml";
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CargoConfigToml {
     build: CargoConfigBuild,
+    target: BTreeMap<String, CargoConfigTarget>,
     unstable: CargoConfigUnstable,
 }
 
@@ -18,11 +20,20 @@ impl CargoConfigToml {
         target_mcu: &String,
         linker: Option<&String>,
     ) -> CargoConfigToml {
+        let mut targets = BTreeMap::new();
+        if let Some(l) = linker {
+            targets.insert(
+                target_architecture.clone(), 
+                CargoConfigTarget { linker: l.clone() }
+            );
+        }
+
         CargoConfigToml { 
-            build: CargoConfigBuild::new(target_architecture, target_mcu, linker), 
+            build: CargoConfigBuild::new(target_architecture, target_mcu),
+            target: targets,
             unstable: CargoConfigUnstable {
                 build_std: Vec::from(["core".to_string()]),
-            } 
+            }, 
         }
     }
 
@@ -35,15 +46,20 @@ impl CargoConfigToml {
         match target_architecture {
             Some(arch) => {
                 self.build.target = arch.to_ascii_lowercase();
+                
             },
             None => {}
         };
-
-        match linker {
-            Some(l) => {
-                self.build.linker = Some(l.clone());
-            },
-            None => {}
+        if let Some(arch) = target_architecture {
+            if let Some(link) = linker {
+                self.target.insert(
+                    arch.to_ascii_lowercase(), 
+                    CargoConfigTarget {
+                        linker: link.clone()
+                    }
+                );
+            }
+            self.build.target = arch.to_ascii_lowercase();
         }
 
         match target_mcu {
@@ -61,23 +77,26 @@ impl CargoConfigToml {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CargoConfigBuild {
     target: String,
-    linker: Option<String>,
     rustflags: Vec<String>,
 }
 
 impl CargoConfigBuild {
-    fn new(target_architecture: &String, target_mcu: &String, linker: Option<&String>) -> CargoConfigBuild {
+    fn new(target_architecture: &String, target_mcu: &String) -> CargoConfigBuild {
         let arch = target_architecture.to_ascii_lowercase();
         let mcu = target_mcu.to_ascii_lowercase();
         CargoConfigBuild { 
             target: arch, 
-            linker: linker.cloned(), 
             rustflags: Vec::from([
                 "-C".to_string(),
                 format!("target-cpu={}", mcu)
             ]) 
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CargoConfigTarget {
+    linker: String
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -119,6 +138,7 @@ pub fn create_cargo_config(
     Ok(())
 }
 
+// TODO
 pub fn update_cargo_config(
     proj_path: &PathBuf,
     target_architecture: &String,

@@ -15,10 +15,10 @@ pub struct CargoToml {
 }
 
 impl CargoToml {
-    pub fn new(name: &String, feature: &String) -> CargoToml {
+    pub fn new(name: &String, feature: &String, hybrid: &bool) -> CargoToml {
         CargoToml { 
             package: PackageConfig::new(name), 
-            dependencies: DependenciesConfig::new(feature), 
+            dependencies: DependenciesConfig::new(feature, hybrid), 
             bin: Vec::from([BinConfig::new()]), 
             profile: ProfileConfig::new(), 
         }
@@ -54,35 +54,70 @@ pub struct DependenciesConfig {
     pub embedded_hal: String,
     
     #[serde(rename = "arduino-hal")]
-    pub arduino_hal: ArduinoHalConfig,
+    pub arduino_hal: GitHubCrate,
+
+    #[serde(rename = "prustio-arduino")]
+    pub prustio_arduino: Option<GitHubCrate>,
+
+    #[serde(rename = "build-dependencies")]
+    pub build_dependencies: Option<BuildDependencies>,
 }
 
 impl DependenciesConfig {
-    pub fn new(feature: &String) -> DependenciesConfig {
+    pub fn new(feature: &String, hybrid: &bool) -> DependenciesConfig {
         DependenciesConfig { 
             panic_halt: "1.0.0".to_string(), 
             ufmt: "0.2.0".to_string(), 
             nb: "1.1.0".to_string(), 
             embedded_hal: "1.0".to_string(), 
-            arduino_hal: ArduinoHalConfig::new(feature) 
+            arduino_hal: GitHubCrate::new(
+                "https://github.com/rahix/avr-hal".to_string(), 
+                Some("e5c8f37fe48419956e722490a82b9ca9b9fc61a2".to_string()), 
+                Some(Vec::from([feature.clone()]))
+            ),
+            prustio_arduino: if *hybrid {
+                Some(GitHubCrate::new(
+                "https://github.com/MikiiN/prustio-arduino-crate".to_string(), 
+                None, 
+                None
+                ))
+            } else { None },
+            build_dependencies: None
+        }
+
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GitHubCrate {
+    pub git: String,
+    pub rev: Option<String>,
+    pub features: Option<Vec<String>>
+}
+
+impl GitHubCrate {
+    pub fn new(
+        git: String,
+        rev: Option<String>,
+        features: Option<Vec<String>>
+    ) -> GitHubCrate {
+        GitHubCrate { 
+            git: git.clone(), 
+            rev: rev,
+            features: features
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ArduinoHalConfig {
-    pub git: String,
-    pub rev: String,
-    pub features: Vec<String>,
+pub struct BuildDependencies {
+    pub fs_extra: String
 }
 
-impl ArduinoHalConfig {
-    pub fn new(feature: &String) -> ArduinoHalConfig {
-        ArduinoHalConfig { 
-            git: "https://github.com/rahix/avr-hal".to_string(), 
-            rev: "e5c8f37fe48419956e722490a82b9ca9b9fc61a2".to_string(), 
-            features: Vec::from([feature.clone()]),
-        }
+impl BuildDependencies {
+    pub fn new() -> BuildDependencies {
+        BuildDependencies { fs_extra: "1.3".to_string() }
     }
 }
 
@@ -164,11 +199,12 @@ impl ProfileReleaseConfig {
 pub fn create_cargo_toml_config(
     proj_path: &PathBuf, 
     project_name: &String, 
-    board_feature: &String
+    board_feature: &String,
+    hybrid: &bool,
 ) -> Result<(), String> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
     
-    let config = CargoToml::new(project_name, board_feature);
+    let config = CargoToml::new(project_name, board_feature, hybrid);
 
     let content = match toml::to_string_pretty(&config) {
         Ok(c) => c,

@@ -1,9 +1,13 @@
 use dirs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
-const APP_DIR_NAME: &str = ".prustio";
+pub const APP_DIR_NAME: &str = ".prustio";
+pub const PROJECT_APP_DIR_NAME: &str = ".prio";
 
-pub fn ensure_dir_existence(path: &PathBuf) -> Result<(), String> {
+pub const PIO_COMPILATION_PROJECT_DIR_NAME: &str = "pio_workspace";
+pub const COMPILED_LIBS_DIR_NAME: &str = "builded_libs";
+
+pub fn ensure_dir_exists(path: &PathBuf) -> Result<(), String> {
     if !path.exists() {
         match std::fs::create_dir(path) {
             Ok(_) => (),
@@ -17,6 +21,19 @@ pub fn ensure_dir_existence(path: &PathBuf) -> Result<(), String> {
             },
         }
     }
+    Ok(())
+}
+
+pub fn clear_dir(path: &PathBuf) -> Result<(), String> {
+    if path.exists() {
+        match std::fs::remove_dir_all(path) {
+            Ok(_) => (),
+            Err(_) => {
+                return Err("Failed to remove directory".to_string());
+            }
+        }
+    }
+    
     Ok(())
 }
 
@@ -34,7 +51,7 @@ pub fn get_venv_executable(venv_dir: &PathBuf, executable: &str) -> PathBuf {
     bin_dir.join(exe_name)
 }
 
-pub fn check_venv_executable_existance(venv_dir: &PathBuf, executable: &str) -> bool {
+pub fn check_venv_executable_existence(venv_dir: &PathBuf, executable: &str) -> bool {
     let exec = get_venv_executable(venv_dir, executable);
     exec.exists()
 }
@@ -48,92 +65,63 @@ pub fn get_app_dir() -> Result<PathBuf, String>  {
     };
     let app_dir = home_dir.join(APP_DIR_NAME);
 
-    ensure_dir_existence(&app_dir)?;
-    return Ok(app_dir);
+    ensure_dir_exists(&app_dir)?;
+    Ok(app_dir)
+}
+
+pub fn get_project_app_dir(proj_path: &PathBuf) -> Result<PathBuf, String> {
+    let local_app_dir = proj_path.join(PROJECT_APP_DIR_NAME);
+    ensure_dir_exists(&local_app_dir)?;
+    Ok(local_app_dir)
 }
 
 // TODO - do better checks
-pub fn check_if_project_dir(path: &PathBuf) -> bool {
+pub fn check_if_is_project_dir(path: &PathBuf) -> bool {
     let conf_file = path.join("Prustio.toml");
     conf_file.exists()
 }
 
-// --------------------------------
-//  Parsing pio pkg list dependencies list
-// --------------------------------
-
-use regex::Regex;
-
-#[derive(Debug, PartialEq)]
-pub enum Category {
-    Platform,
-    Framework,
-    Tool,
-    Library,
+pub fn check_if_is_pio_dir(path: &PathBuf) -> bool {
+    let conf_file = path.join("platformio.ini");
+    conf_file.exists()
 }
 
-#[derive(Debug, PartialEq)]
-pub struct LockedDependency {
-    pub name: String,
-    pub version: String,
-    pub category: Category,
-}
+pub fn get_compiled_libs_names(proj_path: &PathBuf) -> Vec<String> {
+    let libs_dir_path = proj_path.join(PROJECT_APP_DIR_NAME)
+                                 .join(COMPILED_LIBS_DIR_NAME);
+    // wrapper library needs to by in the first place to make linking work
+    // let mut lib_names = Vec::from(["Wrapper".to_string()]);
+    // if !libs_dir_path.exists() {
+    //     return lib_names;
+    // } 
 
-pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<LockedDependency>, String> {
-    let package_regex = match Regex::new(r"([a-zA-Z0-9\-_/]+)\s+@\s+([a-zA-Z0-9\.\-\+]+)") {
-        Ok(regex) => regex,
-        Err(_) => {
-            return Err("Failed to parse regex expression".to_string());
-        }
-    };
-    
-    let mut locked_deps = Vec::new();
-    let mut in_libraries_section = false;
+    let mut lib_names = Vec::new();
+    if !libs_dir_path.exists() {
+        return lib_names;
+    }
 
-    for line in stdout.lines() {
-        // check if entered the libraries section
-        if line.starts_with("Libraries") {
-            in_libraries_section = true;
-            continue;
-        }
+    if let Ok(entries) = fs::read_dir(libs_dir_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
 
-        // skip empty lines or headers
-        if line.trim().is_empty() || !line.contains('@') {
-            continue;
-        }
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "a") {
+                if let Some(file_stem) = path.file_stem().and_then(|n| n.to_str()) { 
+                    // skip already added wrapper
+                    if file_stem.contains("Wrapper") {
+                        continue;
+                    }
 
-        // extract the name and version
-        if let Some(captures) = package_regex.captures(line) {
-            let name = match captures.get(1) {
-                Some(n) => n.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting name.".to_string());
+                    // remove lib prefix
+                    let link_name = if file_stem.starts_with("lib") {
+                        &file_stem[3..]
+                    } else {
+                        file_stem
+                    };
+                    lib_names.push(link_name.to_string());
                 }
-            };
-            let version = match captures.get(2) {
-                Some(v) => v.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting version.".to_string());
-                }
-            }; 
-
-            // determine the category based on context and prefixes
-            let category = if line.starts_with("Platform") {
-                Category::Platform
-            } else if name.starts_with("framework-") {
-                Category::Framework
-            } else if name.starts_with("tool-") || name.starts_with("toolchain-") {
-                Category::Tool
-            } else if in_libraries_section {
-                Category::Library
-            } else {
-                // fallback
-                Category::Library 
-            };
-
-            locked_deps.push(LockedDependency { name, version, category });
+            }
         }
     }
 
-    Ok(locked_deps)
+    lib_names
 }

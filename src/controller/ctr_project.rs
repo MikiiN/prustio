@@ -84,7 +84,7 @@ fn cargo_init(
 
     cargo_config_toml::create_cargo_config(proj_path, board_arch, board_mcu)?;
 
-    cargo_toml::create_cargo_toml_config(proj_path, proj_name,cargo_feature)?;
+    cargo_toml::create_cargo_toml_config(proj_path, proj_name,cargo_feature, hybrid)?;
 
     source_code::write_example_code(proj_path, hybrid)?;
 

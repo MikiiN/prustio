@@ -19,7 +19,7 @@ pub struct Configuration {
 pub struct Package {
     pub name: String,
     version: String,
-    hybrid_mode: bool
+    pub hybrid_mode: bool
 }
 
 impl Package {
