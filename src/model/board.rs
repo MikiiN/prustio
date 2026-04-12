@@ -229,7 +229,19 @@ fn get_pio_upload_config(board_id: &str, platform: &str) -> Result<PioUploadConf
 
 pub fn get_board(id: &str) -> Result<Board, String> {
     let board = match id {
+        "diecimilaatmega168" => Board::new(id, "arduino-diecimila", "nightly-2025-04-27")?,
+        "leonardo" => Board::new(id, "arduino-leonardo", "nightly-2025-04-27")?,
+        "atmega2560" => Board::new(id, "arduino-mega2560", "nightly-2025-04-27")?,
+        "atmega1280" => Board::new(id, "arduino-mega1280", "nightly-2025-04-27")?,
+        "nanoatmega328" => Board::new(id, "arduino-nano", "nightly-2025-04-27")?,
+        "micro" => Board::new(id, "arduino-micro", "nightly-2025-04-27")?,
         "uno" => Board::new(id, "arduino-uno", "nightly-2025-04-27")?,
+        "protrinket3" => Board::new(id, "trinket-pro", "nightly-2025-04-27")?,
+        "protrinket5" => Board::new(id, "trinket-pro", "nightly-2025-04-27")?,
+        "sparkfun_promicro8" => Board::new(id, "sparkfun-promicro", "nightly-2025-04-27")?,
+        "trinket3" => Board::new(id, "trinket", "nightly-2025-04-27")?,
+        "trinket5" => Board::new(id, "trinket", "nightly-2025-04-27")?,
+        "nanoatmega168" => Board::new(id, "nano168", "nightly-2025-04-27")?,
         _ => {
             return Err("Unsupported board ID.".to_string());
         }

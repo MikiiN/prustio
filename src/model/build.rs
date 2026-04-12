@@ -23,9 +23,9 @@ pub fn write_build_configuration(proj_path: &PathBuf, lib_names: &Vec<String>) -
 
 fn get_build_content(lib_dir: &PathBuf, lib_names: &Vec<String>) -> String {
     let mut content = String::from("fn main() {\n");
-    content += format!("    println!(\"cargo:rustc-link-search=native={}\");", lib_dir.display()).as_str();
+    content += format!("    println!(\"cargo:rustc-link-search=native={}\");\n", lib_dir.display()).as_str();
 
-    content += format!("println!(\"cargo:rustc-link-arg={}/wrapper.cpp.o\");", lib_dir.display()).as_str();
+    content += format!("    println!(\"cargo:rustc-link-arg={}/wrapper.cpp.o\");", lib_dir.display()).as_str();
 
     for name in lib_names {
         content += format!("\n    println!(\"cargo:rustc-link-arg=-l{}\");", name).as_str();
