@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fs;
+use std::process::exit;
 use serde::{Deserialize, Serialize};
 
 use crate::wrapper::platformio;
@@ -9,7 +10,21 @@ const UNSPECIFIED_RUSTC_VERSION: &str = "nightly-2025-04-27";
 const PLATFORMS_DIR: &str = "platforms";
 const BOARDS_DIR: &str = "boards";
 
-const SUPPORTED_BOARD_IDS: &[&str] = &["uno"];
+const SUPPORTED_BOARD_IDS: &[&str] = &[
+    "diecimilaatmega168",
+    "leonardo",
+    "ATmega2560",
+    "ATmega1280",
+    "nanoatmega328",
+    "uno",
+    "micro",
+    // "protrinket3",
+    // "protrinket5",
+    "sparkfun_promicro8",
+    // "trinket3",
+    // "trinket5",
+    "nanoatmega168",
+];
 
 #[derive(Debug, Serialize)]
 pub struct Board {
@@ -141,11 +156,14 @@ fn get_pio_board(id: &str) -> Result<PioBoard, String> {
             if boards.is_empty() {
                 return Err(String::from("Invalid board ID"));
             }
-            let best_match = boards[0].clone();
-            if best_match.id == id {
-                return Ok(best_match);
+            for board in &boards {
+                if board.id == id {
+                    return Ok(board.clone());
+                }
             }
-            return Err(String::from("Invalid board ID"));
+
+            let best_match = boards[0].clone();
+            return Ok(best_match);
         },
         Err(e) => { return Err(e) },
     }
@@ -227,20 +245,17 @@ fn get_pio_upload_config(board_id: &str, platform: &str) -> Result<PioUploadConf
  ------------------------------- 
 */
 
+// TODO - not all boards are showing
 pub fn get_board(id: &str) -> Result<Board, String> {
     let board = match id {
         "diecimilaatmega168" => Board::new(id, "arduino-diecimila", "nightly-2025-04-27")?,
         "leonardo" => Board::new(id, "arduino-leonardo", "nightly-2025-04-27")?,
-        "atmega2560" => Board::new(id, "arduino-mega2560", "nightly-2025-04-27")?,
-        "atmega1280" => Board::new(id, "arduino-mega1280", "nightly-2025-04-27")?,
+        "ATmega2560" => Board::new(id, "arduino-mega2560", "nightly-2025-04-27")?,
+        "ATmega1280" => Board::new(id, "arduino-mega1280", "nightly-2025-04-27")?,
         "nanoatmega328" => Board::new(id, "arduino-nano", "nightly-2025-04-27")?,
         "micro" => Board::new(id, "arduino-micro", "nightly-2025-04-27")?,
         "uno" => Board::new(id, "arduino-uno", "nightly-2025-04-27")?,
-        "protrinket3" => Board::new(id, "trinket-pro", "nightly-2025-04-27")?,
-        "protrinket5" => Board::new(id, "trinket-pro", "nightly-2025-04-27")?,
         "sparkfun_promicro8" => Board::new(id, "sparkfun-promicro", "nightly-2025-04-27")?,
-        "trinket3" => Board::new(id, "trinket", "nightly-2025-04-27")?,
-        "trinket5" => Board::new(id, "trinket", "nightly-2025-04-27")?,
         "nanoatmega168" => Board::new(id, "nano168", "nightly-2025-04-27")?,
         _ => {
             return Err("Unsupported board ID.".to_string());
@@ -259,7 +274,9 @@ pub fn get_boards(filter: Option<&String>) -> Vec<Board> {
     for id in board_ids {
         match get_board(id) {
             Ok(b) => boards.push(b),
-            Err(_) => {}
+            Err(e) => {
+                eprintln!("Err: {}", e);
+            }
         }
     }
     boards
