@@ -31,6 +31,10 @@ fn get_build_content(lib_dir: &PathBuf, lib_names: &Vec<String>) -> String {
         content += format!("\n    println!(\"cargo:rustc-link-arg=-l{}\");", name).as_str();
     }
 
+    content += "\n    println!(\"cargo:rustc-link-arg=-lc\");";  
+    content += "\n    println!(\"cargo:rustc-link-arg=-lm\");";
+    content += "\n    println!(\"cargo:rustc-link-arg=-lgcc\");";
+
     content += "\n}";
 
     content
