@@ -72,10 +72,8 @@ int c_serial_peek(void);
 void c_serial_flush(void);
 size_t c_serial_write(uint8_t val);
 size_t c_serial_write_buffer(const uint8_t *buf, size_t len);
-size_t c_serial_print_str(const char *str);
-size_t c_serial_println_str(const char *str);
-size_t c_serial_print_int(int val);
-size_t c_serial_println_int(int val);
+size_t c_serial_print(const char *str);
+size_t c_serial_println(const char *str);
 
 // --- Wire (I2C) ---
 void c_wire_begin(void);

@@ -245,7 +245,6 @@ fn get_pio_upload_config(board_id: &str, platform: &str) -> Result<PioUploadConf
  ------------------------------- 
 */
 
-// TODO - not all boards are showing
 pub fn get_board(id: &str) -> Result<Board, String> {
     let board = match id {
         "diecimilaatmega168" => Board::new(id, "arduino-diecimila", "nightly-2025-04-27")?,
