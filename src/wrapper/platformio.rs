@@ -1,11 +1,12 @@
 use std::fs::{self, ReadDir};
 use std::io::Error;
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, ExitStatus, Output, Stdio};
 use regex::Regex;
 
 use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
+use crate::ui::device::{EOL, Parity};
 use crate::utils::{
     check_if_is_pio_dir, 
     check_venv_executable_existence, 
@@ -17,7 +18,6 @@ use crate::utils::{
     PIO_COMPILATION_PROJECT_DIR_NAME,
     COMPILED_LIBS_DIR_NAME,
 };
-use crate::wrapper::avr;
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";
 const PIO_CORE_DIR_NAME: &str = "pio_core";
@@ -59,7 +59,7 @@ pub fn setup_platformio() -> Result<(), String> {
         .expect("Failed to execute python3. Is Python installed?");
 
     if !venv_status.success() {
-        return Err(String::from("Failed to create python virtual environment."));
+        return Err("Failed to create python virtual environment.".to_string());
     }
 
     let pip_path = get_venv_executable(&venv_dir, "pip");
@@ -70,7 +70,7 @@ pub fn setup_platformio() -> Result<(), String> {
         .expect("Failed to execute pip install.");
 
     if !pip_status.success() {
-        return Err(String::from("Failed to install the platformIO."));
+        return Err("Failed to install the platformIO.".to_string());
     }
     Ok(())
 }
@@ -165,7 +165,7 @@ pub fn init_compilation_project(
         } 
     };
 
-     if !output.status.success() {
+    if !output.status.success() {
         return Err("PlatformIO failed to execute init command".to_string());
     }
 
@@ -190,6 +190,124 @@ pub fn init_compilation_project(
         }
     };
 
+    Ok(())
+}
+
+pub fn device_monitor(
+    project_dir: &PathBuf,
+    port: &Option<String>, 
+    baud: &Option<u32>, 
+    parity: &Option<Parity>, 
+    rtscts: &bool, 
+    xonxoff: &bool, 
+    rts: &Option<u8>, 
+    dtr: &Option<u8>, 
+    echo: &bool, 
+    encoding: &Option<String>, 
+    filter: &Option<String>, 
+    eol: &Option<EOL>, 
+    raw: &bool, 
+    exit_char: &Option<u8>, 
+    menu_char: &Option<u8>, 
+    quiet: &bool, 
+    no_reconnect: &bool,
+) -> Result<(), String> {
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let mut pio_args = Vec::from(["device", "monitor"]);
+    
+    if let Some(p) = port {
+        pio_args.push("--port");
+        pio_args.push(p.as_str());
+    }
+
+    let baud_string: String;
+    if let Some(b) = baud {
+        pio_args.push("--baud");
+        baud_string = b.to_string();
+        pio_args.push(baud_string.as_str());
+    }
+
+    let parity_string: String;
+    if let Some(p) = parity {
+        parity_string = p.to_string(); 
+        pio_args.push("--parity");
+        pio_args.push(parity_string.as_str());
+    }
+
+    if *rtscts {
+        pio_args.push("--rtscts");
+    }
+
+    if *xonxoff {
+        pio_args.push("--xonxoff");
+    }
+
+    let rts_string: String;
+    if let Some(value) = rts {
+        rts_string = value.to_string();
+        pio_args.push("--rts");
+        pio_args.push(&rts_string);
+    }
+
+    let dtr_string: String;
+    if let Some(value) = dtr {
+        dtr_string = value.to_string();
+        pio_args.push("--dtr");
+        pio_args.push(&dtr_string);
+    }
+
+    if *echo {
+        pio_args.push("--echo");
+    }
+
+    if let Some(value) = encoding {
+        pio_args.push("--encoding");
+        pio_args.push(value.as_str());
+    }
+
+    if let Some(value) = filter {
+        pio_args.push("--filter");
+        pio_args.push(value.as_str());
+    }
+
+
+    let eol_string: String;
+    if let Some(value) = eol {
+        eol_string = value.to_string();
+        pio_args.push("--eol");
+        pio_args.push(eol_string.as_str());
+    }
+
+    if *raw {
+        pio_args.push("--raw");
+    }
+
+    let exit_string: String;
+    if let Some(value) = exit_char {
+        exit_string = value.to_string();
+        pio_args.push("--exit-char");
+        pio_args.push(&exit_string);
+    }
+
+    let menu_string: String;
+    if let Some(value) = menu_char {
+        menu_string = value.to_string();
+        pio_args.push("--menu-char");
+        pio_args.push(&menu_string);
+    }
+
+    if *quiet {
+        pio_args.push("--quiet");
+    }
+
+    if *no_reconnect {
+        pio_args.push("--no_reconnect");
+    }
+
+    let status = run_pio_command_with_output(&venv_dir, &core_dir, &pio_args, Some(project_dir))?;
+    if !status.success() {
+        return Err("PlatformIO monitor exited".to_string());
+    }
     Ok(())
 }
 
@@ -326,6 +444,36 @@ fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], ru
                 .output()
         }
     }
+}
+
+fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], run_dir: Option<&PathBuf>) -> Result<ExitStatus, String> {
+    let pio_path = get_venv_executable(venv_dir, "pio");
+    let mut child = match run_dir {
+        Some(dir) => {
+            Command::new(pio_path)
+                .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .args(pio_args)
+                .current_dir(dir)
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .map_err(|e| format!("Failed to spawn PlatformIO process: {}", e))?
+        },
+        None => {
+            Command::new(pio_path)
+                .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .args(pio_args)
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .map_err(|e| format!("Failed to spawn PlatformIO process: {}", e))?
+        }
+    };
+    let status = child.wait()
+        .map_err(|e| format!("Failed to wait on PlatformIO process: {}", e))?;
+    Ok(status)
 }
 
 // --------------------------------

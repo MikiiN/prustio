@@ -36,8 +36,28 @@ fn run_command(cli: &ui::Cli) {
             DeviceCommands::List { json_output } => {
                 ctr_device::device_list(json_output);
             },
-            DeviceCommands::Monitor { port } => {
-                let _ = port;
+            DeviceCommands::Monitor { 
+                port, 
+                baud, 
+                parity, 
+                rtscts, 
+                xonxoff, 
+                rts, 
+                dtr, 
+                echo, 
+                encoding, 
+                filter, 
+                eol, 
+                raw, 
+                exit_char, 
+                menu_char, 
+                quiet, 
+                no_reconnect 
+            } => {
+                ctr_device::device_monitor(
+                    port, baud, parity, rtscts, xonxoff, rts, dtr, echo, 
+                    encoding, filter, eol, raw, exit_char, menu_char, quiet, no_reconnect
+                );
             }
         },
 
