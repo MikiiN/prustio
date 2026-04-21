@@ -48,13 +48,13 @@ fn get_main_example_content_hybrid_mode() -> String {
 
 use panic_halt as _;
 
-use prustio_arduino::{init, Pin, mode, delay, PinMode, PinState, digital_write};
+use prustio_arduino::{init, Pin, pin_mode, delay, PinMode, PinState, digital_write};
 
 #[arduino_hal::entry]
 fn main() -> ! {
     init();
     let pin = Pin::new(13);
-    mode(&pin, PinMode::Output);
+    pin_mode(&pin, PinMode::Output);
 
     loop {
         digital_write(&pin, PinState::High);

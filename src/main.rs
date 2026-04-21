@@ -1,3 +1,5 @@
+use std::process::exit;
+
 mod controller;
 mod cpp_templates;
 mod model;
@@ -6,5 +8,5 @@ mod utils;
 mod wrapper;
 
 fn main() {
-    controller::execute();
+    exit(controller::execute());
 }

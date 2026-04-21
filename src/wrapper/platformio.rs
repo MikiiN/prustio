@@ -1,23 +1,16 @@
+use std::env;
 use std::fs::{self, ReadDir};
 use std::io::Error;
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, ExitStatus, Output, Stdio};
 use regex::Regex;
 
 use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
+use crate::ui::device::{EOL, Parity};
 use crate::utils::{
-    check_if_is_pio_dir, 
-    check_venv_executable_existence, 
-    clear_dir, 
-    ensure_dir_exists, 
-    get_app_dir, 
-    get_project_app_dir, 
-    get_venv_executable,
-    PIO_COMPILATION_PROJECT_DIR_NAME,
-    COMPILED_LIBS_DIR_NAME,
+    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_if_is_project_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
 };
-use crate::wrapper::avr;
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";
 const PIO_CORE_DIR_NAME: &str = "pio_core";
@@ -38,6 +31,14 @@ pub fn get_boards(filter: &str) -> std::io::Result<Output> {
 }
 
 pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
+    // try to get local application pio dir
+    // let proj_path = match env::current_dir() {
+    //     Ok(path) => path,
+    //     Err(_) => {
+    //         return Err("Failed to get current working directory.".to_string());
+    //     },
+    // };
+    // get global application pio dir (in home directory)
     let app_dir = get_app_dir()?;
 
     let pio_venv_dir = app_dir.join(PIO_VENV_DIR_NAME);
@@ -52,25 +53,25 @@ pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
 // TODO check for python existence
 pub fn setup_platformio() -> Result<(), String> {
     let (venv_dir, _ ) = get_pio_dirs()?; 
-    let venv_status = std::process::Command::new("python3")
+    let venv_status = Command::new("python3")
         .args(["-m", "venv"])
         .arg(&venv_dir)
         .status()
         .expect("Failed to execute python3. Is Python installed?");
 
     if !venv_status.success() {
-        return Err(String::from("Failed to create python virtual environment."));
+        return Err("Failed to create python virtual environment.".to_string());
     }
 
     let pip_path = get_venv_executable(&venv_dir, "pip");
 
-    let pip_status = std::process::Command::new(pip_path)
+    let pip_status = Command::new(pip_path)
         .args(["install", "-U", "platformio"])
         .status()
         .expect("Failed to execute pip install.");
 
     if !pip_status.success() {
-        return Err(String::from("Failed to install the platformIO."));
+        return Err("Failed to install the platformIO.".to_string());
     }
     Ok(())
 }
@@ -139,6 +140,8 @@ pub fn init_compilation_project(
     platform: &String,
     board_id: &String,
     framework: &String,
+    platform_packages: Option<&Vec<String>>,
+    lib_deps: Option<&Vec<String>>,
 ) ->Result<(), String> {
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
@@ -165,11 +168,11 @@ pub fn init_compilation_project(
         } 
     };
 
-     if !output.status.success() {
+    if !output.status.success() {
         return Err("PlatformIO failed to execute init command".to_string());
     }
 
-    platformio_ini::rewrite_pio_config(&pio_proj, platform, board_id, framework)?;
+    platformio_ini::rewrite_pio_config(&pio_proj, platform, board_id, framework, platform_packages, lib_deps)?;
 
     let pio_src = pio_proj.join(PIO_SRC_DIR_NAME);
     ensure_dir_exists(&pio_src)?;
@@ -191,6 +194,153 @@ pub fn init_compilation_project(
     };
 
     Ok(())
+}
+
+pub fn device_monitor(
+    project_dir: &PathBuf,
+    port: &Option<String>, 
+    baud: &Option<u32>, 
+    parity: &Option<Parity>, 
+    rtscts: &bool, 
+    xonxoff: &bool, 
+    rts: &Option<u8>, 
+    dtr: &Option<u8>, 
+    echo: &bool, 
+    encoding: &Option<String>, 
+    filter: &Option<String>, 
+    eol: &Option<EOL>, 
+    raw: &bool, 
+    exit_char: &Option<u8>, 
+    menu_char: &Option<u8>, 
+    quiet: &bool, 
+    no_reconnect: &bool,
+) -> Result<(), String> {
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let mut pio_args = Vec::from(["device", "monitor"]);
+    
+    if let Some(p) = port {
+        pio_args.push("--port");
+        pio_args.push(p.as_str());
+    }
+
+    let baud_string: String;
+    if let Some(b) = baud {
+        pio_args.push("--baud");
+        baud_string = b.to_string();
+        pio_args.push(baud_string.as_str());
+    }
+
+    let parity_string: String;
+    if let Some(p) = parity {
+        parity_string = p.to_string(); 
+        pio_args.push("--parity");
+        pio_args.push(parity_string.as_str());
+    }
+
+    if *rtscts {
+        pio_args.push("--rtscts");
+    }
+
+    if *xonxoff {
+        pio_args.push("--xonxoff");
+    }
+
+    let rts_string: String;
+    if let Some(value) = rts {
+        rts_string = value.to_string();
+        pio_args.push("--rts");
+        pio_args.push(&rts_string);
+    }
+
+    let dtr_string: String;
+    if let Some(value) = dtr {
+        dtr_string = value.to_string();
+        pio_args.push("--dtr");
+        pio_args.push(&dtr_string);
+    }
+
+    if *echo {
+        pio_args.push("--echo");
+    }
+
+    if let Some(value) = encoding {
+        pio_args.push("--encoding");
+        pio_args.push(value.as_str());
+    }
+
+    if let Some(value) = filter {
+        pio_args.push("--filter");
+        pio_args.push(value.as_str());
+    }
+
+
+    let eol_string: String;
+    if let Some(value) = eol {
+        eol_string = value.to_string();
+        pio_args.push("--eol");
+        pio_args.push(eol_string.as_str());
+    }
+
+    if *raw {
+        pio_args.push("--raw");
+    }
+
+    let exit_string: String;
+    if let Some(value) = exit_char {
+        exit_string = value.to_string();
+        pio_args.push("--exit-char");
+        pio_args.push(&exit_string);
+    }
+
+    let menu_string: String;
+    if let Some(value) = menu_char {
+        menu_string = value.to_string();
+        pio_args.push("--menu-char");
+        pio_args.push(&menu_string);
+    }
+
+    if *quiet {
+        pio_args.push("--quiet");
+    }
+
+    if *no_reconnect {
+        pio_args.push("--no_reconnect");
+    }
+
+    let status = run_pio_command_with_output(&venv_dir, &core_dir, &pio_args, Some(project_dir))?;
+    if !status.success() {
+        return Err("PlatformIO monitor exited".to_string());
+    }
+    Ok(())
+}
+
+pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, String> {
+    let app_dir = get_project_app_dir(project_dir)?;
+    let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
+
+    if !check_if_is_pio_dir(&pio_proj) {
+        return Err("Missing PlatformIO project to extract dependencies from.".to_string());
+    }
+
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let pio_args = [
+        "pkg", "list"
+    ];
+    let output = match run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj)) {
+        Ok(o) => o,
+        Err(_) => {
+            return Err("Failed to execute PlatformIO pkg list command.".to_string());
+        } 
+    };
+
+    if !output.status.success() {
+        return Err("PlatformIO pkg list failed.".to_string());
+    }
+
+    match String::from_utf8(output.stdout) {
+        Ok(stdout) => Ok(stdout),
+        Err(_) => Err("Failed to parse PlatformIO pkg list output as UTF-8".to_string()),
+    }
 }
 
 pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(), String> {
@@ -328,80 +478,32 @@ fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], ru
     }
 }
 
-// --------------------------------
-//  Parsing pio pkg list dependencies list
-// --------------------------------
-
-#[derive(Debug, PartialEq)]
-pub enum Category {
-    Platform,
-    Framework,
-    Tool,
-    Library,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct LockedDependency {
-    pub name: String,
-    pub version: String,
-    pub category: Category,
-}
-
-pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<LockedDependency>, String> {
-    let package_regex = match Regex::new(r"([a-zA-Z0-9\-_/]+)\s+@\s+([a-zA-Z0-9\.\-\+]+)") {
-        Ok(regex) => regex,
-        Err(_) => {
-            return Err("Failed to parse regex expression".to_string());
+fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], run_dir: Option<&PathBuf>) -> Result<ExitStatus, String> {
+    let pio_path = get_venv_executable(venv_dir, "pio");
+    let mut child = match run_dir {
+        Some(dir) => {
+            Command::new(pio_path)
+                .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .args(pio_args)
+                .current_dir(dir)
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .map_err(|e| format!("Failed to spawn PlatformIO process: {}", e))?
+        },
+        None => {
+            Command::new(pio_path)
+                .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .args(pio_args)
+                .stdin(Stdio::inherit())
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()
+                .map_err(|e| format!("Failed to spawn PlatformIO process: {}", e))?
         }
     };
-    
-    let mut locked_deps = Vec::new();
-    let mut in_libraries_section = false;
-
-    for line in stdout.lines() {
-        // check if entered the libraries section
-        if line.starts_with("Libraries") {
-            in_libraries_section = true;
-            continue;
-        }
-
-        // skip empty lines or headers
-        if line.trim().is_empty() || !line.contains('@') {
-            continue;
-        }
-
-        // extract the name and version
-        if let Some(captures) = package_regex.captures(line) {
-            let name = match captures.get(1) {
-                Some(n) => n.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting name.".to_string());
-                }
-            };
-            let version = match captures.get(2) {
-                Some(v) => v.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting version.".to_string());
-                }
-            }; 
-
-            // determine the category based on context and prefixes
-            let category = if line.starts_with("Platform") {
-                Category::Platform
-            } else if name.starts_with("framework-") {
-                Category::Framework
-            } else if name.starts_with("tool-") || name.starts_with("toolchain-") {
-                Category::Tool
-            } else if in_libraries_section {
-                Category::Library
-            } else {
-                // fallback
-                Category::Library 
-            };
-
-            locked_deps.push(LockedDependency { name, version, category });
-        }
-    }
-
-    Ok(locked_deps)
+    let status = child.wait()
+        .map_err(|e| format!("Failed to wait on PlatformIO process: {}", e))?;
+    Ok(status)
 }

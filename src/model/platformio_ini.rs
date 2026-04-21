@@ -9,6 +9,12 @@ pub struct PioEnvConfig {
     board: String,
     framework: String,
     build_flags: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    platform_packages: Option<String>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lib_deps: Option<String>,
 }
 
 impl PioEnvConfig {
@@ -16,12 +22,19 @@ impl PioEnvConfig {
         platform: &String,
         board_id: &String,
         framework: &String,
+        platform_packages: Option<&Vec<String>>,
+        lib_deps: Option<&Vec<String>>,
     ) -> PioEnvConfig {
+        let packages_str = platform_packages.map(|pkgs| pkgs.join(""));
+        let deps_str = lib_deps.map(|deps| deps.join(""));
+
         PioEnvConfig { 
             platform: platform.clone(), 
             board: board_id.clone(), 
             framework: framework.clone(), 
             build_flags: "-c".to_string(), 
+            platform_packages: packages_str,
+            lib_deps: deps_str,
         }
     }
 }
@@ -31,15 +44,16 @@ pub fn rewrite_pio_config(
     platform: &String,
     board_id: &String,
     framework: &String,
+    platform_packages: Option<&Vec<String>>,
+    lib_deps: Option<&Vec<String>>,
 ) -> Result<(), String> {
     let config_file = pio_proj.join(PIO_CONFIG_FILE_NAME);
     if !config_file.exists() {
         return Err("PlatformIO project does not exist on given path.".to_string());
     }
 
-
     let mut config: BTreeMap<String, PioEnvConfig> = BTreeMap::new();
-    let env_conf = PioEnvConfig::new(platform, board_id, framework);
+    let env_conf = PioEnvConfig::new(platform, board_id, framework, platform_packages, lib_deps);
     
     // section header to be formatted like [env:uno]
     let section_name = format!("env:{}", board_id);

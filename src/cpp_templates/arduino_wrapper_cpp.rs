@@ -68,10 +68,8 @@ extern "C" {
     void c_serial_flush() { Serial.flush(); }
     size_t c_serial_write(uint8_t val) { return Serial.write(val); }
     size_t c_serial_write_buffer(const uint8_t *buf, size_t len) { return Serial.write(buf, len); }
-    size_t c_serial_print_str(const char *str) { return Serial.print(str); }
-    size_t c_serial_println_str(const char *str) { return Serial.println(str); }
-    size_t c_serial_print_int(int val) { return Serial.print(val); }
-    size_t c_serial_println_int(int val) { return Serial.println(val); }
+    size_t c_serial_print(const char *str) { return Serial.print(str); }
+    size_t c_serial_println(const char *str) { return Serial.println(str); }
 
     // --- Wire (I2C) ---
     void c_wire_begin() { Wire.begin(); }

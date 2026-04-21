@@ -77,3 +77,19 @@ pub fn print_devices_json(devices: &Vec<PioDevice>) {
     };
     println!("{}", json_string);
 }
+
+pub fn info(msg: &str) {
+    println!("{}", msg);
+}
+
+pub fn success(msg: &str) {
+    println!("{}", msg.green());
+}
+
+pub fn error(msg: &str) {
+    eprintln!("{} {}", "Error: ".red().bold(), msg.red());
+}
+
+pub fn warn(msg: &str) {
+    eprintln!("{} {}", "Warning: ".yellow().bold(), msg.yellow());
+}

@@ -15,20 +15,4 @@ pub enum ProjectCommands {
         #[arg(long)]
         json_output: bool,
     },
-    Add {
-        package: Option<String>,
-
-        #[arg(long)]
-        json_output: bool,
-    },
-    Remove {
-        package: Option<String>,
-
-        #[arg(long)]
-        json_output: bool,
-    },
-    Tasks {
-        #[arg(long)]
-        json_output: bool,
-    }
 }
