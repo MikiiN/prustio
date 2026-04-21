@@ -3,9 +3,8 @@ use std::path::PathBuf;
 
 use crate::model::board::Board;
 use crate::model::prustio_config::Env;
-use crate::model::{board, build, cargo_config_toml, cargo_toml, device, prustio_config};
+use crate::model::{board, build, cargo_config_toml, cargo_toml, device, platformio_lock, prustio_config};
 use crate::utils;
-use crate::wrapper::avr::obtain_bin_path;
 use crate::wrapper::{cargo, avr, avrdude, platformio};
 
 const DEFAULT_ELF_BIN_NAME: &str = "bin.elf";
@@ -15,34 +14,20 @@ pub fn run(
     target: &Option<String>,
     environment: Option<&String>,
     json_output: &bool,
-) {
+) -> Result<(), String> {
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
-            eprintln!("Error: Failed to get current working directory.");
-            return;
+            return Err("Failed to get current working directory.".to_string());
         },
     };
     if !utils::check_if_is_project_dir(&proj_path) {
-        eprintln!("Error: Not in project dir.");
-        return;
+        return Err("Not in project dir.".to_string());
     }
 
-    let package = match prustio_config::get_package_information(&proj_path) {
-        Ok(p) => p,
-        Err(err) => {
-            eprintln!("Error: {}", err);
-            return;
-        }
-    };
+    let package = prustio_config::get_package_information(&proj_path)?;
 
-    let env = match prustio_config::get_env(&proj_path, environment) {
-        Ok(e) => e,
-        Err(err) => {
-            eprintln!("Error: {}", err);
-            return;
-        }
-    };
+    let env = prustio_config::get_env(&proj_path, environment)?;
 
     // TODO target usage
     // let target = match target {
@@ -62,20 +47,11 @@ pub fn run(
     //     }
     // };
 
-    let board = match board::get_board(&env.board) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    };
+    let board = board::get_board(&env.board)?;
     let board_arch = board.platform.to_cargo_arch();
 
     if package.hybrid_mode {
-        if let Err(msg) = prepare_hybrid_mode_compilation(&proj_path, &board, &env) {
-            eprintln!("Error: {}", msg);
-            return;
-        }
+        prepare_hybrid_mode_compilation(&proj_path, &board, &env)?;
     }
 
     // TODO add linker only when hybrid mode is used
@@ -83,79 +59,48 @@ pub fn run(
         Ok(path) => match path.to_str() {
             Some(str_path) => str_path.to_string(),
             None => {
-                eprintln!("Error: Failed to obtain avr-gcc binary path.");
-                return;
+                return Err("Failed to obtain avr-gcc binary path.".to_string());
             }
         },
         Err(msg) => {
-            eprintln!("Error: {}",msg);
-            return;
+            return Err(msg);
         }
     };
 
-    match cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, Some(&linker)) {
-        Ok(_) => {},
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    }
+    cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, Some(&linker))?;
 
-    match cargo_toml::create_cargo_toml_config(
+    cargo_toml::create_cargo_toml_config(
         &proj_path, 
         &package.name, 
         &board.cargo_feature, 
         &package.hybrid_mode
-    ) {
-        Ok(_) => {},
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    }
+    )?;
 
-    match cargo::cargo_build(&proj_path, &None) {
-        Ok(_) => {},
-        Err(_) => {
-            eprintln!("Error: Failed to build project");
-            return;
-        }
-    }
+    cargo::cargo_build(&proj_path, &None)?;
+
     let binary_path = get_binary_dir_path(&board_arch);
     let elf_bin_path = binary_path.join(DEFAULT_ELF_BIN_NAME);
     let hex_bin_path = binary_path.join(DEFAULT_HEX_BIN_NAME);
 
-    match avr::elf_to_hex(&elf_bin_path, &hex_bin_path) {
-        Ok(_) => {},
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    }
-
+    avr::elf_to_hex(&elf_bin_path, &hex_bin_path)?;
+    
     let device = match device::get_connected_device_list() {
         Ok(mut ports) => {
             match ports.pop() {
                 Some(p) => p,
                 None => {
-                    eprintln!("Error: No connected device to upload.");
-                    return;        
+                    return Err("No connected device to upload.".to_string());        
                 }
             }
-        }
+        },
         Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
+            return Err(e);
         }
     };
 
-    match avrdude::upload_binary(&hex_bin_path, &board.mcu, &board.upload_protocol, &device.port, &board.bus_speed) {
-        Ok(_) => (),
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            return;
-        }
-    }
+    avrdude::upload_binary(&hex_bin_path, &board.mcu, &board.upload_protocol, &device.port, &board.bus_speed)?;
+
+    Ok(())
 }
 
 fn get_binary_dir_path(board_arch: &String) -> PathBuf {
@@ -172,9 +117,41 @@ fn prepare_hybrid_mode_compilation(
         Some(f) => f.clone(),
         None => "arduino".to_string()
     };
-    platformio::init_compilation_project(proj_dir, &board.platform.to_string(), &board.id, &framework)?;
-    
-    platformio::compile_c_libraries(proj_dir, &board.id)?;
+    let lock_file = platformio_lock::get_pio_lock_path(proj_dir);
+    if lock_file.exists() {
+        let deps = platformio_lock::Lockfile::load(proj_dir)?;
+        let platform_packages = deps.get_platform_packages();
+        let libs_deps = deps.get_lib_deps();
+
+        platformio::init_compilation_project(
+            proj_dir, 
+            &board.platform.to_string(), 
+            &board.id, 
+            &framework,
+            Some(&platform_packages),
+            if !libs_deps.is_empty() {
+                Some(&libs_deps)
+            } else {
+                None
+            }
+        )?;
+        platformio::compile_c_libraries(proj_dir, &board.id)?;
+    } else {
+        platformio::init_compilation_project(
+            proj_dir, 
+            &board.platform.to_string(), 
+            &board.id, 
+            &framework,
+            None,
+            None
+        )?;
+        platformio::compile_c_libraries(proj_dir, &board.id)?;
+
+        let output = platformio::get_pio_project_dependencies(proj_dir)?;
+        let deps = platformio_lock::parse_pio_list_output(&output)?;
+        let lock = platformio_lock::Lockfile::new(deps, 1);
+        lock.save(proj_dir)?;
+    }
 
     let lib_names = utils::get_compiled_libs_names(proj_dir);
 

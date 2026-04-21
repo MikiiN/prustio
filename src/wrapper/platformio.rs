@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::{self, ReadDir};
 use std::io::Error;
 use std::path::PathBuf;
@@ -8,15 +9,7 @@ use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
 use crate::ui::device::{EOL, Parity};
 use crate::utils::{
-    check_if_is_pio_dir, 
-    check_venv_executable_existence, 
-    clear_dir, 
-    ensure_dir_exists, 
-    get_app_dir, 
-    get_project_app_dir, 
-    get_venv_executable,
-    PIO_COMPILATION_PROJECT_DIR_NAME,
-    COMPILED_LIBS_DIR_NAME,
+    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_if_is_project_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
 };
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";
@@ -38,6 +31,14 @@ pub fn get_boards(filter: &str) -> std::io::Result<Output> {
 }
 
 pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
+    // try to get local application pio dir
+    // let proj_path = match env::current_dir() {
+    //     Ok(path) => path,
+    //     Err(_) => {
+    //         return Err("Failed to get current working directory.".to_string());
+    //     },
+    // };
+    // get global application pio dir (in home directory)
     let app_dir = get_app_dir()?;
 
     let pio_venv_dir = app_dir.join(PIO_VENV_DIR_NAME);
@@ -52,7 +53,7 @@ pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
 // TODO check for python existence
 pub fn setup_platformio() -> Result<(), String> {
     let (venv_dir, _ ) = get_pio_dirs()?; 
-    let venv_status = std::process::Command::new("python3")
+    let venv_status = Command::new("python3")
         .args(["-m", "venv"])
         .arg(&venv_dir)
         .status()
@@ -64,7 +65,7 @@ pub fn setup_platformio() -> Result<(), String> {
 
     let pip_path = get_venv_executable(&venv_dir, "pip");
 
-    let pip_status = std::process::Command::new(pip_path)
+    let pip_status = Command::new(pip_path)
         .args(["install", "-U", "platformio"])
         .status()
         .expect("Failed to execute pip install.");
@@ -139,6 +140,8 @@ pub fn init_compilation_project(
     platform: &String,
     board_id: &String,
     framework: &String,
+    platform_packages: Option<&Vec<String>>,
+    lib_deps: Option<&Vec<String>>,
 ) ->Result<(), String> {
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
@@ -169,7 +172,7 @@ pub fn init_compilation_project(
         return Err("PlatformIO failed to execute init command".to_string());
     }
 
-    platformio_ini::rewrite_pio_config(&pio_proj, platform, board_id, framework)?;
+    platformio_ini::rewrite_pio_config(&pio_proj, platform, board_id, framework, platform_packages, lib_deps)?;
 
     let pio_src = pio_proj.join(PIO_SRC_DIR_NAME);
     ensure_dir_exists(&pio_src)?;
@@ -309,6 +312,35 @@ pub fn device_monitor(
         return Err("PlatformIO monitor exited".to_string());
     }
     Ok(())
+}
+
+pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, String> {
+    let app_dir = get_project_app_dir(project_dir)?;
+    let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
+
+    if !check_if_is_pio_dir(&pio_proj) {
+        return Err("Missing PlatformIO project to extract dependencies from.".to_string());
+    }
+
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let pio_args = [
+        "pkg", "list"
+    ];
+    let output = match run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj)) {
+        Ok(o) => o,
+        Err(_) => {
+            return Err("Failed to execute PlatformIO pkg list command.".to_string());
+        } 
+    };
+
+    if !output.status.success() {
+        return Err("PlatformIO pkg list failed.".to_string());
+    }
+
+    match String::from_utf8(output.stdout) {
+        Ok(stdout) => Ok(stdout),
+        Err(_) => Err("Failed to parse PlatformIO pkg list output as UTF-8".to_string()),
+    }
 }
 
 pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(), String> {
@@ -474,82 +506,4 @@ fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args:
     let status = child.wait()
         .map_err(|e| format!("Failed to wait on PlatformIO process: {}", e))?;
     Ok(status)
-}
-
-// --------------------------------
-//  Parsing pio pkg list dependencies list
-// --------------------------------
-
-#[derive(Debug, PartialEq)]
-pub enum Category {
-    Platform,
-    Framework,
-    Tool,
-    Library,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct LockedDependency {
-    pub name: String,
-    pub version: String,
-    pub category: Category,
-}
-
-pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<LockedDependency>, String> {
-    let package_regex = match Regex::new(r"([a-zA-Z0-9\-_/]+)\s+@\s+([a-zA-Z0-9\.\-\+]+)") {
-        Ok(regex) => regex,
-        Err(_) => {
-            return Err("Failed to parse regex expression".to_string());
-        }
-    };
-    
-    let mut locked_deps = Vec::new();
-    let mut in_libraries_section = false;
-
-    for line in stdout.lines() {
-        // check if entered the libraries section
-        if line.starts_with("Libraries") {
-            in_libraries_section = true;
-            continue;
-        }
-
-        // skip empty lines or headers
-        if line.trim().is_empty() || !line.contains('@') {
-            continue;
-        }
-
-        // extract the name and version
-        if let Some(captures) = package_regex.captures(line) {
-            let name = match captures.get(1) {
-                Some(n) => n.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting name.".to_string());
-                }
-            };
-            let version = match captures.get(2) {
-                Some(v) => v.as_str().to_string(),
-                None => {
-                    return Err("Internal error while getting version.".to_string());
-                }
-            }; 
-
-            // determine the category based on context and prefixes
-            let category = if line.starts_with("Platform") {
-                Category::Platform
-            } else if name.starts_with("framework-") {
-                Category::Framework
-            } else if name.starts_with("tool-") || name.starts_with("toolchain-") {
-                Category::Tool
-            } else if in_libraries_section {
-                Category::Library
-            } else {
-                // fallback
-                Category::Library 
-            };
-
-            locked_deps.push(LockedDependency { name, version, category });
-        }
-    }
-
-    Ok(locked_deps)
 }

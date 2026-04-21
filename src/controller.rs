@@ -2,6 +2,7 @@ use clap::Parser;
 
 use crate::ui;
 use crate::ui::device::DeviceCommands;
+use crate::ui::display;
 use crate::ui::project::ProjectCommands;
 use crate::wrapper::platformio;
 
@@ -10,26 +11,27 @@ mod ctr_device;
 mod ctr_project;
 mod ctr_run;
 
-pub fn execute() {
+pub fn execute() -> i32 {
     if !platformio::check_pio_installation() {
-        match platformio::setup_platformio() {
-            Ok(_) => (),
-            Err(e) => {
-                eprintln!("Can not install application's instance of PlatformIO:\n{}", e);
-                return;
-            }
+        if let Err(_) = platformio::setup_platformio() {
+            display::error("Can not install application's instance of PlatformIO");
+            return 1;
         }
     }
 
     let cli = ui::Cli::parse();
-    run_command(&cli);
-
+    if let Err(msg) = run_command(&cli) {
+        display::error(msg.as_str());
+        return 1;
+    }
+    display::success("Successfully executed command.");
+    return 0;
 }
 
-fn run_command(cli: &ui::Cli) {
+fn run_command(cli: &ui::Cli) -> Result<(), String> {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
-            ctr_board::board(filter.as_ref(), json_output);
+            ctr_board::board(filter.as_ref(), json_output)?;
         },
 
         ui::TopLevelCommands::Device { command } => match command {
@@ -57,7 +59,7 @@ fn run_command(cli: &ui::Cli) {
                 ctr_device::device_monitor(
                     port, baud, parity, rtscts, xonxoff, rts, dtr, echo, 
                     encoding, filter, eol, raw, exit_char, menu_char, quiet, no_reconnect
-                );
+                )?;
             }
         },
 
@@ -67,7 +69,7 @@ fn run_command(cli: &ui::Cli) {
                 let _ = json_output;
             },
             ProjectCommands::Init { name, board, hybrid, json_output } => {
-                ctr_project::init_project(name, board, hybrid, json_output);
+                ctr_project::init_project(name, board, hybrid, json_output)?;
             },
             ProjectCommands::Remove { package, json_output } => {
                 let _ = package;
@@ -79,7 +81,7 @@ fn run_command(cli: &ui::Cli) {
         },
 
         ui::TopLevelCommands::Run {target, environment, json_output} => {
-            ctr_run::run(target, environment.as_ref(), json_output);
+            ctr_run::run(target, environment.as_ref(), json_output)?;
         },
 
         ui::TopLevelCommands::Activate { environment, json_output } => {
@@ -91,4 +93,5 @@ fn run_command(cli: &ui::Cli) {
             let _ = json_output;
         },
     }
+    Ok(())
 }

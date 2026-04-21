@@ -37,17 +37,17 @@ pub fn device_monitor(
     menu_char: &Option<u8>, 
     quiet: &bool, 
     no_reconnect: &bool 
-) {
+) ->Result<(), String> {
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
-            eprintln!("Error: Failed to get current working directory.");
-            return;
+            return Err("Error: Failed to get current working directory.".to_string());
         },
     };
 
-    let result = platformio::device_monitor(
+    platformio::device_monitor(
         &proj_path, port, baud, parity, rtscts, xonxoff, rts, dtr,
         echo, encoding, filter, eol, raw, exit_char, menu_char, quiet, no_reconnect
-    );
+    )?;
+    Ok(())
 }

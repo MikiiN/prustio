@@ -1,0 +1,145 @@
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::future::poll_fn;
+use std::path::PathBuf;
+
+const FILE_NAME: &str = "platformio.lock";
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Category {
+    Platform,
+    Framework,
+    Tool,
+    Library,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Dependency {
+    pub name: String,
+    pub version: String,
+    pub category: Category,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Lockfile {
+    pub version: u8,
+    pub dependencies: Vec<Dependency>,
+}
+
+impl Lockfile {
+    pub fn new(dependencies: Vec<Dependency>, version: u8) -> Lockfile {
+        Lockfile { version, dependencies }
+    }
+
+    pub fn update(&mut self, dependencies: Vec<Dependency>) {
+        self.version += 1;
+        self.dependencies = dependencies;
+    }
+
+    pub fn load(proj_dir: &PathBuf) -> Result<Lockfile, String> {
+        let lock_path = proj_dir.join(FILE_NAME);
+        if !lock_path.exists() {
+            return Err("PlatformIO lock file does not exists.".to_string());
+        }
+
+        if let Ok(contents) = fs::read_to_string(lock_path) {
+            let data: Lockfile = match toml::from_str(&contents) {
+                Ok(d) => d,
+                Err(_) => {
+                    return Err("Failed to parse PlatformIO lock file.".to_string());
+                }
+            };
+            Ok(data)
+        } else {
+            Err("Failed to read PlatformIO lock file.".to_string())
+        }
+    }
+
+    pub fn get_platform_packages(&self) -> Vec<String> {
+        self.dependencies
+            .iter()
+            .filter(|dep| dep.category == Category::Framework)
+            .map(|dep| format!("\n    {} @ {}", dep.name, dep.version))
+            .collect()
+    }
+
+    pub fn get_lib_deps(&self) -> Vec<String> {
+        self.dependencies
+            .iter()
+            .filter(|dep| dep.category == Category::Library)
+            .map(|dep| format!("/n    {} @ {}", dep.name, dep.version))
+            .collect()
+    }
+
+    pub fn save(&self, proj_dir: &PathBuf) -> Result<(), String> {
+        let lock_path = proj_dir.join(FILE_NAME);
+        let toml_string = toml::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize lockfile: {}", e))?;
+        fs::write(lock_path, toml_string)
+            .map_err(|e| format!("Failed to write lockfile: {}", e))
+    }
+}
+
+pub fn get_pio_lock_path(proj_dir: &PathBuf) -> PathBuf { 
+    proj_dir.join(FILE_NAME)
+}
+
+pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<Dependency>, String> {
+    let package_regex = match Regex::new(r"([a-zA-Z0-9\-_/]+)\s+@\s+([a-zA-Z0-9\.\-\+]+)") {
+        Ok(regex) => regex,
+        Err(_) => {
+            return Err("Failed to parse regex expression".to_string());
+        }
+    };
+    
+    let mut locked_deps = Vec::new();
+    let mut in_libraries_section = false;
+
+    for line in stdout.lines() {
+        // check if entered the libraries section
+        if line.starts_with("Libraries") {
+            in_libraries_section = true;
+            continue;
+        }
+
+        // skip empty lines or headers
+        if line.trim().is_empty() || !line.contains('@') {
+            continue;
+        }
+
+        // extract the name and version
+        if let Some(captures) = package_regex.captures(line) {
+            let name = match captures.get(1) {
+                Some(n) => n.as_str().to_string(),
+                None => {
+                    return Err("Internal error while getting name.".to_string());
+                }
+            };
+            let version = match captures.get(2) {
+                Some(v) => v.as_str().to_string(),
+                None => {
+                    return Err("Internal error while getting version.".to_string());
+                }
+            }; 
+
+            // determine the category based on context and prefixes
+            let category = if line.starts_with("Platform") {
+                Category::Platform
+            } else if name.starts_with("framework-") {
+                Category::Framework
+            } else if name.starts_with("tool-") || name.starts_with("toolchain-") {
+                Category::Tool
+            } else if in_libraries_section {
+                Category::Library
+            } else {
+                // fallback
+                Category::Library 
+            };
+
+            locked_deps.push(Dependency { name, version, category });
+        }
+    }
+
+    Ok(locked_deps)
+}

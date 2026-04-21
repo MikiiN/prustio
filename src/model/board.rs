@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fs;
-use std::process::exit;
 use serde::{Deserialize, Serialize};
 
 use crate::wrapper::platformio;
