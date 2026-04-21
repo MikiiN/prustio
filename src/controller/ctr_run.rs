@@ -2,7 +2,8 @@ use std::{env, path};
 use std::path::PathBuf;
 
 use crate::model::board::Board;
-use crate::model::prustio_config::Env;
+use crate::model::device::PioDevice;
+use crate::model::prustio_config::{Env, Package};
 use crate::model::{board, build, cargo_config_toml, cargo_toml, device, platformio_lock, prustio_config};
 use crate::utils;
 use crate::wrapper::{cargo, avr, avrdude, platformio};
@@ -26,32 +27,85 @@ pub fn run(
     }
 
     let package = prustio_config::get_package_information(&proj_path)?;
-
     let env = prustio_config::get_env(&proj_path, environment)?;
 
-    // TODO target usage
-    // let target = match target {
-    //     Some(t) => {
-    //         // TODO target validation
-    //         Vec::from([t.clone()])
-    //     },
-    //     None => {
-    //         match &env.targets {
-    //             Some(ts) => ts,
-    //             None => {
-    //                 let mut ts: Vec<String> = Vec::new();
-    //                 ts.push(String::from("upload"));
-    //                 ts
-    //             }
-    //         }
-    //     }
-    // };
+    let targets = match target {
+        Some(t) => {
+            Vec::from([Target::from(t)?])
+        },
+        None => {
+            match &env.targets {
+                Some(ts) => {
+                    let mut targets = Vec::new();
+                    for target in ts {
+                        targets.push(Target::from(target)?);
+                    }
+                    targets
+                },
+                None => {
+                    Vec::from([Target::Upload])
+                }
+            }
+        }
+    };
 
     let board = board::get_board(&env.board)?;
     let board_arch = board.platform.to_cargo_arch();
 
+    let binary_path = get_binary_dir_path(&board_arch);
+    let elf_bin_path = binary_path.join(DEFAULT_ELF_BIN_NAME);
+    let hex_bin_path = binary_path.join(DEFAULT_HEX_BIN_NAME);
+
+    for t in targets {
+        match t {
+            Target::Build => {
+                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path)?;
+            },
+            Target::Upload => {
+                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path)?;
+                upload_project(&board, &hex_bin_path)?;
+            }
+        }
+    }
+
+
+    Ok(())
+}
+
+enum Target {
+    Build,
+    Upload,
+}
+
+impl Target {
+    fn from(text: &String) -> Result<Target, String> {
+        let value = text.to_ascii_lowercase();
+        match value.as_str() {
+            "build" => Ok(Target::Build),
+            "upload" => Ok(Target::Upload),
+            _ => Err("Invalid target name.".to_string())
+        }
+    }
+
+    fn to_string(&self) -> String {
+        match self {
+            Target::Build => "build".to_string(),
+            Target::Upload => "upload".to_string(),
+        }
+    }
+}
+
+fn build_project(
+    proj_path: &PathBuf,
+    package: &Package,
+    board: &Board,
+    env: &Env,
+    board_arch: &String,
+    elf_bin_path: &PathBuf,
+    hex_bin_path: &PathBuf,
+) -> Result<(), String> {
     if package.hybrid_mode {
-        prepare_hybrid_mode_compilation(&proj_path, &board, &env)?;
+        prepare_hybrid_mode_compilation(proj_path, board, env)?;
         
         let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
             Ok(path) => match path.to_str() {
@@ -64,27 +118,30 @@ pub fn run(
                 return Err(msg);
             }
         };
-        cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, Some(&linker))?;
+        cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, Some(&linker))?;
     } else {
-        cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, None)?;
+        cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, None)?;
     }
-    
 
     cargo_toml::create_cargo_toml_config(
-        &proj_path, 
+        proj_path, 
         &package.name, 
         &board.cargo_feature, 
         &package.hybrid_mode
     )?;
 
-    cargo::cargo_build(&proj_path, &None)?;
+    cargo::cargo_build(proj_path, &None)?;
 
-    let binary_path = get_binary_dir_path(&board_arch);
-    let elf_bin_path = binary_path.join(DEFAULT_ELF_BIN_NAME);
-    let hex_bin_path = binary_path.join(DEFAULT_HEX_BIN_NAME);
+    avr::elf_to_hex(elf_bin_path, hex_bin_path)?;
 
-    avr::elf_to_hex(&elf_bin_path, &hex_bin_path)?;
-    
+    Ok(())
+}
+
+fn upload_project(
+    board: &Board,
+    hex_bin_path: &PathBuf,
+
+) -> Result<(), String> {
     let device = match device::get_connected_device_list() {
         Ok(mut ports) => {
             match ports.pop() {
@@ -98,7 +155,6 @@ pub fn run(
             return Err(e);
         }
     };
-
     avrdude::upload_binary(&hex_bin_path, &board.mcu, &board.upload_protocol, &device.port, &board.bus_speed)?;
 
     Ok(())
