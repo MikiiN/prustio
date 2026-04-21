@@ -11,15 +11,56 @@ const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Configuration {
-    package: Package,
+    pub package: Package,
     env: Option<BTreeMap<String, Env>>,
+}
+
+impl Configuration {
+    pub fn from(content: &String) -> Result<Configuration, String> {
+        let config: Configuration = match toml_edit::de::from_str(content) {
+            Ok(c) => c,
+            Err(_) => {
+                return Err(String::from("Failed to parse PrustIO configuration file."));
+            }
+        };
+
+        Ok(config)
+    }
+
+    pub fn save(&self, proj_path: &PathBuf) -> Result<(), String> {
+        let file = PathBuf::from(proj_path).join(PRUSTIO_CONFIG_FILE_NAME);
+        let raw_toml = match toml::to_string_pretty(self) {
+            Ok(res) => res,
+            Err(_) => return Err("Failed to serialize configuration.".to_string()),
+        };
+
+        let clean_toml = raw_toml.replace("[env]\n\n", "");
+
+        if let Err(_) = fs::write(&file, clean_toml) {
+            return Err("Failed to write configuration.".to_string());
+        }
+
+        Ok(())
+    }
+
+    pub fn set_active_env(&mut self, env: &String) -> Result<(), String> {
+        if let Some(envs) = &self.env {
+            if envs.contains_key(env) {
+                self.package.set_active_env(env);
+                return Ok(());
+            }
+            return Err("Invalid environment name.".to_string());
+        }
+        Err("Empty environment list.".to_string())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
     pub name: String,
     version: String,
-    pub hybrid_mode: bool
+    pub hybrid_mode: bool,
+    pub active_env: Option<String>,
 }
 
 impl Package {
@@ -27,8 +68,13 @@ impl Package {
         Package { 
             name: name.clone(), 
             version: version.clone(), 
-            hybrid_mode: hybrid_mode.clone() 
+            hybrid_mode: hybrid_mode.clone(),
+            active_env: None, 
         }
+    }
+
+    fn set_active_env(&mut self, env: &String) {
+        self.active_env = Some(env.clone());
     }
 }
 
@@ -55,28 +101,12 @@ pub fn create_prustio_config(
     board_id: &String,
     framework: Option<&String>,
 ) -> Result<(), String> {
-    let file = PathBuf::from(proj_path).join(PRUSTIO_CONFIG_FILE_NAME);
-
     let content = match board_id.as_str() {
         UNSPECIFIED_PARAM => create_config_without_env(project_name, hybrid_mode),
         _ => create_config_with_env(project_name, hybrid_mode, board_id, framework)
     };
 
-    let raw_toml = match toml::to_string_pretty(&content) {
-        Ok(res) => res,
-        Err(_) => return Err("Failed to serialize configuration.".to_string()),
-    };
-
-    let clean_toml = raw_toml.replace("[env]\n\n", "");
-
-    match fs::write(&file, clean_toml) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err("Failed to write configuration.".to_string());
-        }
-    };
-
-    Ok(())
+    content.save(proj_path)
 }
 
 fn create_config_without_env(
@@ -139,17 +169,15 @@ pub fn get_env(proj_path: &PathBuf, env_name: Option<&String>) -> Result<Env, St
     }
 }
 
-pub fn get_envs(proj_path: &PathBuf) -> Result<BTreeMap<String, Env>, String> {
+pub fn get_config(proj_path: &PathBuf) -> Result<Configuration, String> {
     let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
     
     let content = read_prustio_config(&config_file)?;
-    
-    let config: Configuration = match toml_edit::de::from_str(&content) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(String::from("Failed to parse PrustIO configuration file."));
-        }
-    };
+    Configuration::from(&content)
+}
+
+pub fn get_envs(proj_path: &PathBuf) -> Result<BTreeMap<String, Env>, String> {
+    let config = get_config(proj_path)?;
     match config.env {
         Some(env) => Ok(env),
         None => Ok(BTreeMap::new())
@@ -157,17 +185,7 @@ pub fn get_envs(proj_path: &PathBuf) -> Result<BTreeMap<String, Env>, String> {
 }
 
 pub fn get_package_information(proj_path: &PathBuf) -> Result<Package, String> {
-    let config_file = proj_path.join(PRUSTIO_CONFIG_FILE_NAME);
-    
-    let content = read_prustio_config(&config_file)?;
-
-    let config: Configuration = match toml_edit::de::from_str(&content) {
-        Ok(c) => c,
-        Err(_) => {
-            return Err(String::from("Failed to parse PrustIO configuration file."));
-        }
-    };
-
+    let config = get_config(proj_path)?;
     Ok(config.package)
 }
 

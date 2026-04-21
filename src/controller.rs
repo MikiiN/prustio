@@ -6,9 +6,11 @@ use crate::ui::display;
 use crate::ui::project::ProjectCommands;
 use crate::wrapper::platformio;
 
+mod ctr_activate;
 mod ctr_board;
 mod ctr_device;
 mod ctr_project;
+mod ctr_refresh;
 mod ctr_run;
 
 pub fn execute() -> i32 {
@@ -64,19 +66,8 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
         },
 
         ui::TopLevelCommands::Project { command } => match command {
-            ProjectCommands::Add { package, json_output } => {
-                let _ = package;
-                let _ = json_output;
-            },
             ProjectCommands::Init { name, board, hybrid, json_output } => {
                 ctr_project::init_project(name, board, hybrid, json_output)?;
-            },
-            ProjectCommands::Remove { package, json_output } => {
-                let _ = package;
-                let _ = json_output;
-            },
-            ProjectCommands::Tasks { json_output } => {
-                let _ = json_output;
             },
         },
 
@@ -85,12 +76,11 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
         },
 
         ui::TopLevelCommands::Activate { environment, json_output } => {
-            let _ = environment;
-            let _ = json_output;
+            ctr_activate::activate_environment(environment, json_output)?;
         },
 
         ui::TopLevelCommands::Refresh { json_output } => {
-            let _ = json_output;
+            ctr_refresh::refresh(json_output)?;
         },
     }
     Ok(())

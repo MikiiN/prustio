@@ -52,22 +52,23 @@ pub fn run(
 
     if package.hybrid_mode {
         prepare_hybrid_mode_compilation(&proj_path, &board, &env)?;
-    }
-
-    // TODO add linker only when hybrid mode is used
-    let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
-        Ok(path) => match path.to_str() {
-            Some(str_path) => str_path.to_string(),
-            None => {
-                return Err("Failed to obtain avr-gcc binary path.".to_string());
+        
+        let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
+            Ok(path) => match path.to_str() {
+                Some(str_path) => str_path.to_string(),
+                None => {
+                    return Err("Failed to obtain avr-gcc binary path.".to_string());
+                }
+            },
+            Err(msg) => {
+                return Err(msg);
             }
-        },
-        Err(msg) => {
-            return Err(msg);
-        }
-    };
-
-    cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, Some(&linker))?;
+        };
+        cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, Some(&linker))?;
+    } else {
+        cargo_config_toml::update_cargo_config(&proj_path, &board_arch, &board.mcu, None)?;
+    }
+    
 
     cargo_toml::create_cargo_toml_config(
         &proj_path, 
