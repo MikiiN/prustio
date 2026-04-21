@@ -1,7 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::future::poll_fn;
 use std::path::PathBuf;
 
 const FILE_NAME: &str = "platformio.lock";
