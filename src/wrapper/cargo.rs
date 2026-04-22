@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::process::{Command, Stdio, ExitStatus};
+use std::process::{Command, Stdio};
 
 pub fn init_cargo(proj_path: &PathBuf) -> Result<(), String> {
     let mut cmd = Command::new("cargo");
