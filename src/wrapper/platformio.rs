@@ -1,15 +1,13 @@
-use std::env;
 use std::fs::{self, ReadDir};
 use std::io::Error;
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Output, Stdio};
-use regex::Regex;
 
 use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
 use crate::ui::device::{EOL, Parity};
 use crate::utils::{
-    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_if_is_project_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
+    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
 };
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";

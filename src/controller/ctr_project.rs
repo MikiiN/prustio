@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::exit};
+use std::path::PathBuf;
 
 use crate::model::{
     board, 
@@ -8,7 +8,6 @@ use crate::model::{
     toolchain_toml, 
     source_code
 };
-use crate::ui::display;
 use crate::wrapper::cargo;
 
 const DEFAULT_PROJECT_NAME: &str = "project";

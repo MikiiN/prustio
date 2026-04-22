@@ -1,8 +1,7 @@
-use std::{env, path};
+use std::env;
 use std::path::PathBuf;
 
 use crate::model::board::Board;
-use crate::model::device::PioDevice;
 use crate::model::prustio_config::{Env, Package};
 use crate::model::{board, build, cargo_config_toml, cargo_toml, device, platformio_lock, prustio_config};
 use crate::utils;

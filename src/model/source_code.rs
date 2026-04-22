@@ -58,9 +58,9 @@ fn main() -> ! {
 
     loop {
         digital_write(&pin, PinState::High);
-        delay(5000);
+        delay(1000);
         digital_write(&pin, PinState::Low);
-        delay(5000);
+        delay(1000);
     }
 }")
 }
