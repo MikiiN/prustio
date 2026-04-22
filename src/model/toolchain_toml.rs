@@ -115,3 +115,26 @@ pub fn update_toolchain_config(
 
     parsed_config.write_configuration(&file_path)
 }
+
+
+//
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_toolchain_config_creation() {
+        let channel = "nightly-2025-04-27".to_string();
+        let components = vec!["rust-src".to_string()];
+        let profile = "minimal".to_string();
+
+        let config = ToolchainConfiguration::new(&channel, &components, &profile);
+
+        assert_eq!(config.toolchain.channel, "nightly-2025-04-27");
+        assert_eq!(config.toolchain.components, vec!["rust-src"]);
+        assert_eq!(config.toolchain.profile, "minimal");
+    }
+}

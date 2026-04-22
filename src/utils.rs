@@ -125,3 +125,44 @@ pub fn get_compiled_libs_names(proj_path: &PathBuf) -> Vec<String> {
 
     lib_names
 }
+
+// 
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_ensure_dir_exists() {
+        let temp = tempdir().unwrap();
+        let new_dir = temp.path().join("new_folder");
+        
+        // Directory shouldn't exist initially
+        assert!(!new_dir.exists());
+        
+        // Function should create it
+        assert!(ensure_dir_exists(&new_dir).is_ok());
+        assert!(new_dir.exists());
+        
+        // Calling it again on an existing directory should not error
+        assert!(ensure_dir_exists(&new_dir).is_ok());
+    }
+
+    #[test]
+    fn test_clear_dir() {
+        let temp = tempdir().unwrap();
+        let dir_to_clear = temp.path().join("to_clear");
+        std::fs::create_dir(&dir_to_clear).unwrap();
+        
+        // Add a dummy file inside the directory
+        std::fs::write(dir_to_clear.join("dummy.txt"), "data").unwrap();
+
+        assert!(clear_dir(&dir_to_clear).is_ok());
+        
+        // The directory and its contents should be gone
+        assert!(!dir_to_clear.exists());
+    }
+}

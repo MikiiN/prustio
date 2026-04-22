@@ -199,3 +199,55 @@ fn read_prustio_config(file_path: &PathBuf) -> Result<String, String> {
         Err(_) => Err(String::from("Failed to read PrustIO configuration file.")),
     }
 }
+
+//
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_configuration_without_env() {
+        let toml_str = r#"
+        [package]
+        name = "test_project"
+        version = "0.1.0"
+        hybrid_mode = false
+        "#;
+        let config = Configuration::from(&toml_str.to_string()).unwrap();
+        assert_eq!(config.package.name, "test_project");
+        assert_eq!(config.package.hybrid_mode, false);
+        assert!(config.env.is_none());
+    }
+
+    #[test]
+    fn test_parse_configuration_with_env() {
+        let toml_str = r#"
+        [package]
+        name = "hybrid_proj"
+        version = "0.1.0"
+        hybrid_mode = true
+
+        [env.uno]
+        board = "uno"
+        "#;
+        let config = Configuration::from(&toml_str.to_string()).unwrap();
+        assert_eq!(config.package.hybrid_mode, true);
+        assert!(config.env.is_some());
+        assert!(config.env.unwrap().contains_key("uno"));
+    }
+
+    #[test]
+    fn test_set_active_env_success_and_fail() {
+        let mut config = create_config_with_env(&"proj".to_string(), &true, &"uno".to_string(), None);
+        
+        // Success case
+        assert!(config.set_active_env(&"uno".to_string()).is_ok());
+        assert_eq!(config.package.active_env, Some("uno".to_string()));
+
+        // Fail case
+        assert!(config.set_active_env(&"mega".to_string()).is_err());
+    }
+}

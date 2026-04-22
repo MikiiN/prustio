@@ -71,3 +71,31 @@ pub fn rewrite_pio_config(
         Err(_) => Err("Failed to write configuration to the PlatformIO's configuration file.".to_string())
     }
 }
+
+
+// 
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pio_env_config_new() {
+        let platform = "atmelavr".to_string();
+        let board = "uno".to_string();
+        let framework = "arduino".to_string();
+        let packages = vec!["pkg1".to_string(), "pkg2".to_string()];
+        
+        let config = PioEnvConfig::new(&platform, &board, &framework, Some(&packages), None);
+        
+        assert_eq!(config.platform, "atmelavr");
+        assert_eq!(config.board, "uno");
+        assert_eq!(config.build_flags, "-c");
+        // Ensure vector joined successfully
+        assert_eq!(config.platform_packages, Some("pkg1pkg2".to_string()));
+        // Ensure missing arrays remain None
+        assert_eq!(config.lib_deps, None);
+    }
+}

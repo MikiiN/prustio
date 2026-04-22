@@ -221,3 +221,33 @@ pub fn create_cargo_toml_config(
     };
     Ok(())
 }
+
+
+//
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cargo_toml_generation_pure_mode() {
+        let cargo = CargoToml::new(&"pure_app".to_string(), &"arduino-uno".to_string(), &false);
+        
+        assert_eq!(cargo.package.name, "pure_app");
+        // Ensure prustio_arduino is NOT included in pure mode
+        assert!(cargo.dependencies.prustio_arduino.is_none());
+        // Check hardware abstraction layer features
+        assert_eq!(cargo.dependencies.arduino_hal.features, Some(vec!["arduino-uno".to_string()]));
+    }
+
+    #[test]
+    fn test_cargo_toml_generation_hybrid_mode() {
+        let cargo = CargoToml::new(&"hybrid_app".to_string(), &"arduino-mega2560".to_string(), &true);
+        
+        // Ensure prustio_arduino IS included in hybrid mode
+        assert!(cargo.dependencies.prustio_arduino.is_some());
+        assert_eq!(cargo.dependencies.arduino_hal.features, Some(vec!["arduino-mega2560".to_string()]));
+    }
+}

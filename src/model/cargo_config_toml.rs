@@ -181,3 +181,39 @@ pub fn update_cargo_config(
     };
     Ok(())
 }
+
+//
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cargo_config_initialization_no_linker() {
+        let arch = "avr-none".to_string();
+        let mcu = "atmega328p".to_string();
+        let config = CargoConfigToml::new(&arch, &mcu, None);
+
+        assert_eq!(config.build.target, "avr-none");
+        assert_eq!(
+            config.build.rustflags, 
+            vec!["-C".to_string(), "target-cpu=atmega328p".to_string()]
+        );
+        assert!(config.target.is_empty());
+    }
+
+    #[test]
+    fn test_cargo_config_update_with_linker() {
+        let arch = "avr-none".to_string();
+        let mcu = "atmega328p".to_string();
+        let linker = "/path/to/avr-gcc".to_string();
+        
+        let mut config = CargoConfigToml::new(&arch, &mcu, None);
+        config.update(Some(&arch), Some(&mcu), Some(&linker));
+
+        assert!(config.target.contains_key("avr-none"));
+        assert_eq!(config.target.get("avr-none").unwrap().linker, "/path/to/avr-gcc");
+    }
+}

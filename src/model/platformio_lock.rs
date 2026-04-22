@@ -142,3 +142,40 @@ pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<Dependency>, String> {
 
     Ok(locked_deps)
 }
+
+
+// 
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_pio_list_output() {
+        let sample_output = "
+Platform atmelavr @ 5.0.0
+Libraries
+├── SomeLib @ 1.2.3
+└── tool-avrdude @ 1.0.0
+";
+        let deps = parse_pio_list_output(sample_output).unwrap();
+        
+        assert_eq!(deps.len(), 3);
+        
+        // Assert Platform extraction
+        assert_eq!(deps[0].name, "atmelavr");
+        assert_eq!(deps[0].version, "5.0.0");
+        assert_eq!(deps[0].category, Category::Platform);
+        
+        // Assert Library extraction
+        assert_eq!(deps[1].name, "SomeLib");
+        assert_eq!(deps[1].version, "1.2.3");
+        assert_eq!(deps[1].category, Category::Library);
+        
+        // Assert Tool extraction (prefix based)
+        assert_eq!(deps[2].name, "tool-avrdude");
+        assert_eq!(deps[2].category, Category::Tool);
+    }
+}
