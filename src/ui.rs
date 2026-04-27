@@ -5,6 +5,7 @@ pub mod display;
 pub mod project;
 
 #[derive(Parser)]
+#[command(version)]
 #[command(name = "PrustIO")]
 #[command(about = "A project manager for Rust embedded projects.", long_about = None)]
 pub struct Cli {
@@ -56,5 +57,10 @@ pub enum TopLevelCommands {
     Refresh {
         #[arg(long)]
         json_output: bool,
-    }
+    },
+
+    Clear {
+        #[arg(long)]
+        json_output: bool,
+    },
 }
