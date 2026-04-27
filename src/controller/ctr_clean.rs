@@ -2,7 +2,7 @@ use std::env;
 
 use crate::utils;
 
-pub fn clear(json_output: &bool) -> Result<(), String> {
+pub fn clean(json_output: &bool) -> Result<(), String> {
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {

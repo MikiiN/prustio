@@ -8,7 +8,7 @@ use crate::wrapper::platformio;
 
 mod ctr_activate;
 mod ctr_board;
-mod ctr_clear;
+mod ctr_clean;
 mod ctr_device;
 mod ctr_project;
 mod ctr_refresh;
@@ -83,9 +83,9 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
         ui::TopLevelCommands::Refresh { json_output } => {
             ctr_refresh::refresh(json_output)?;
         },
-        
-        ui::TopLevelCommands::Clear { json_output } => {
-            ctr_clear::clear(json_output)?;
+
+        ui::TopLevelCommands::Clean { json_output } => {
+            ctr_clean::clean(json_output)?;
         },
     }
     Ok(())

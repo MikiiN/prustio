@@ -59,7 +59,7 @@ pub enum TopLevelCommands {
         json_output: bool,
     },
 
-    Clear {
+    Clean {
         #[arg(long)]
         json_output: bool,
     },
