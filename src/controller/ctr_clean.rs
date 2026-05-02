@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::utils;
+use crate::{utils, wrapper};
 
 pub fn clean(json_output: &bool) -> Result<(), String> {
     let proj_path = match env::current_dir() {
@@ -16,14 +16,13 @@ pub fn clean(json_output: &bool) -> Result<(), String> {
 
     let target_dir = proj_path.join("target");
     let prio_dir = proj_path.join(utils::PROJECT_APP_DIR_NAME);
-
-    // Use the existing clear_dir utility to remove them safely
-    if target_dir.exists() {
-        utils::clear_dir(&target_dir)?;
-    }
     
     if prio_dir.exists() {
         utils::clear_dir(&prio_dir)?;
+    }
+
+    if target_dir.exists() {
+        wrapper::cargo::cargo_clean(&proj_path)?;
     }
 
     Ok(())

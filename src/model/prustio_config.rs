@@ -147,6 +147,7 @@ fn create_config_with_env(
 
 pub fn get_env(proj_path: &PathBuf, env_name: Option<&String>) -> Result<Env, String> {
     let envs = get_envs(proj_path)?;
+    println!("{:?}", env_name);
     match env_name {
         Some(name) => {
             for (key, env) in envs {

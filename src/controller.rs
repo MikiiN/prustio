@@ -23,11 +23,20 @@ pub fn execute() -> i32 {
     }
 
     let cli = ui::Cli::parse();
-    if let Err(msg) = run_command(&cli) {
-        display::error(msg.as_str());
-        return 1;
+    match run_command(&cli) {
+        Ok(output) => {
+            if let Some(msg) = output {
+                display::success(msg.as_str());
+            } else {
+                display::success("Successfully executed command.");
+            }
+        },
+        Err(msg) => {
+            display::error(msg.as_str());
+            return 1;
+        }
     }
-    display::success("Successfully executed command.");
+
     return 0;
 }
 
@@ -42,22 +51,9 @@ fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
                 ctr_device::device_list(json_output);
             },
             DeviceCommands::Monitor { 
-                port, 
-                baud, 
-                parity, 
-                rtscts, 
-                xonxoff, 
-                rts, 
-                dtr, 
-                echo, 
-                encoding, 
-                filter, 
-                eol, 
-                raw, 
-                exit_char, 
-                menu_char, 
-                quiet, 
-                no_reconnect 
+                port, baud, parity, rtscts, xonxoff, rts, 
+                dtr, echo, encoding, filter, eol, raw, exit_char, 
+                menu_char, quiet, no_reconnect 
             } => {
                 ctr_device::device_monitor(
                     port, baud, parity, rtscts, xonxoff, rts, dtr, echo, 

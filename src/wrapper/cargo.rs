@@ -42,11 +42,33 @@ pub fn cargo_build(proj_path: &PathBuf, target: &Option<String>) -> Result<(), S
      match output {
         Ok(output) => {
             if !output.status.success() {
-                return Err(String::from("Tool avr-objcopy failed."));
+                return Err("Tool avr-objcopy failed.".to_string());
             }
         },
         Err(_) => {
-            return Err(String::from("Failed to run avr-objcopy tool."));
+            return Err("Failed to run avr-objcopy tool.".to_string());
+        }
+    }
+    Ok(())
+}
+
+pub fn cargo_clean(proj_path: &PathBuf) -> Result<(), String> {
+    let mut cmd = Command::new("cargo");
+    cmd.arg("clean").current_dir(proj_path);
+
+    let output = cmd
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output();
+    
+    match output {
+        Ok(output) => {
+            if !output.status.success() {
+                return Err(String::from("Tool cargo failed."));
+            }
+        },
+        Err(_) => {
+            return Err(String::from("Failed to run cargo clean."));
         }
     }
     Ok(())

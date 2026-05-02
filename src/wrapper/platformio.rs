@@ -29,13 +29,6 @@ pub fn get_boards(filter: &str) -> std::io::Result<Output> {
 }
 
 pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
-    // try to get local application pio dir
-    // let proj_path = match env::current_dir() {
-    //     Ok(path) => path,
-    //     Err(_) => {
-    //         return Err("Failed to get current working directory.".to_string());
-    //     },
-    // };
     // get global application pio dir (in home directory)
     let app_dir = get_app_dir()?;
 
@@ -87,7 +80,7 @@ pub fn download_pio_toolchain(toolchain_name: &str) -> Result<(), String> {
     match run_pio_command(&venv_dir, &core_dir, &args, None) {
         Ok(_) => {},
         Err(_) => {
-            return Err(String::from("PlatformIO failed to install toolchain."));
+            return Err("PlatformIO failed to install toolchain.".to_string());
         } 
     };
     
@@ -107,7 +100,7 @@ pub fn download_pio_platform(platform_name: &str) -> Result<(), String> {
     match run_pio_command(&venv_dir, &core_dir, &args, None) {
         Ok(_) => {},
         Err(_) => {
-            return Err(String::from("PlatformIO failed to install toolchain."));
+            return Err("PlatformIO failed to install toolchain.".to_string());
         } 
     };
     
@@ -374,11 +367,6 @@ pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(
     if !pio_build_dir.exists() {
         return Err("Missing pio build directory.".to_string());
     }
-
-    // archive the wrapper
-    // let wrapper_obj = pio_build_dir.join("src").join("wrapper.cpp.o");
-    // // let wrapper_lib = compiled_dir.join("libWrapper.a");
-    // // avr::archive_object_file(&wrapper_obj, &wrapper_lib)?;
 
     let wrapper_dir = pio_build_dir.join("src");
     copy_lib_to_dir("wrapper.cpp.o", &wrapper_dir, &compiled_dir)?;

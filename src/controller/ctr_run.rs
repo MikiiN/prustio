@@ -2,8 +2,9 @@ use std::env;
 use std::path::PathBuf;
 
 use crate::model::board::Board;
-use crate::model::prustio_config::{Env, Package};
+use crate::model::prustio_config::{Env, Package, };
 use crate::model::{board, build, cargo_config_toml, cargo_toml, device, platformio_lock, prustio_config};
+use crate::ui::display;
 use crate::utils;
 use crate::wrapper::{cargo, avr, avrdude, platformio};
 
@@ -55,14 +56,18 @@ pub fn run(
     let elf_bin_path = binary_path.join(DEFAULT_ELF_BIN_NAME);
     let hex_bin_path = binary_path.join(DEFAULT_HEX_BIN_NAME);
 
+    let mut config = prustio_config::get_config(&proj_path)?;
+    config.set_active_env(&env.name)?;
+    config.save(&proj_path)?;
+
     for t in targets {
         match t {
             Target::Build => {
-                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path)?;
+                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path, json_output)?;
             },
             Target::Upload => {
-                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path)?;
-                upload_project(&board, &hex_bin_path)?;
+                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path, json_output)?;
+                upload_project(&board, &hex_bin_path, json_output)?;
             }
         }
     }
@@ -102,9 +107,15 @@ fn build_project(
     board_arch: &String,
     elf_bin_path: &PathBuf,
     hex_bin_path: &PathBuf,
+    json_output: &bool,
 ) -> Result<(), String> {
+    if !*json_output { 
+        display::info("Starting build process..."); 
+    }
+
+    if !*json_output { display::info("Configuring cargo..."); }
     if package.hybrid_mode {
-        prepare_hybrid_mode_compilation(proj_path, board, env)?;
+        prepare_hybrid_mode_compilation(proj_path, board, env, json_output)?;
         
         let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
             Ok(path) => match path.to_str() {
@@ -129,9 +140,15 @@ fn build_project(
         &package.hybrid_mode
     )?;
 
+    if !*json_output { display::info("Building project..."); }
     cargo::cargo_build(proj_path, &None)?;
 
+    if !*json_output { display::info("Converting ELF to HEX format..."); }
     avr::elf_to_hex(elf_bin_path, hex_bin_path)?;
+
+    if !*json_output { 
+        display::info("Build finished."); 
+    }
 
     Ok(())
 }
@@ -139,8 +156,13 @@ fn build_project(
 fn upload_project(
     board: &Board,
     hex_bin_path: &PathBuf,
-
+    json_output: &bool,
 ) -> Result<(), String> {
+    if !*json_output { 
+        display::info("Uploading binary file..."); 
+    }
+
+    if !*json_output { display::info("Detecting connected devices..."); }
     let device = match device::get_connected_device_list() {
         Ok(mut ports) => {
             match ports.pop() {
@@ -154,8 +176,13 @@ fn upload_project(
             return Err(e);
         }
     };
+
+    if !*json_output { display::info(&format!("Uploading binary to {}...", device.port)); }
     avrdude::upload_binary(&hex_bin_path, &board.mcu, &board.upload_protocol, &device.port, &board.bus_speed)?;
 
+    if !*json_output { 
+        display::info("Successfully Uploaded."); 
+    }
     Ok(())
 }
 
@@ -167,8 +194,10 @@ fn prepare_hybrid_mode_compilation(
     proj_dir: &PathBuf,
     board: &Board,
     env: &Env,
-
+    json_output: &bool,
 ) -> Result<(), String> {
+    if !*json_output { display::info("Preparing PlatformIO project for hybrid mode..."); }
+
     let framework = match &env.framework {
         Some(f) => f.clone(),
         None => "arduino".to_string()
@@ -191,6 +220,8 @@ fn prepare_hybrid_mode_compilation(
                 None
             }
         )?;
+
+        if !*json_output { display::info("Compiling C/C++ libraries..."); }
         platformio::compile_c_libraries(proj_dir, &board.id)?;
     } else {
         platformio::init_compilation_project(
@@ -201,6 +232,8 @@ fn prepare_hybrid_mode_compilation(
             None,
             None
         )?;
+
+        if !*json_output { display::info("Compiling C/C++ libraries..."); }
         platformio::compile_c_libraries(proj_dir, &board.id)?;
 
         let output = platformio::get_pio_project_dependencies(proj_dir)?;
@@ -209,8 +242,8 @@ fn prepare_hybrid_mode_compilation(
         lock.save(proj_dir)?;
     }
 
+    if !*json_output { display::info("Writing Rust build scripts..."); }
     let lib_names = utils::get_compiled_libs_names(proj_dir);
-
     build::write_build_configuration(proj_dir, &lib_names)?;
 
     Ok(())
