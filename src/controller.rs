@@ -31,7 +31,7 @@ pub fn execute() -> i32 {
     return 0;
 }
 
-fn run_command(cli: &ui::Cli) -> Result<(), String> {
+fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
             ctr_board::board(filter.as_ref(), json_output)?;
@@ -69,6 +69,7 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
         ui::TopLevelCommands::Project { command } => match command {
             ProjectCommands::Init { name, board, hybrid, json_output } => {
                 ctr_project::init_project(name, board, hybrid, json_output)?;
+                return Ok(Some("The project was successfully initialized.".to_string()));
             },
         },
 
@@ -78,15 +79,18 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
 
         ui::TopLevelCommands::Activate { environment, json_output } => {
             ctr_activate::activate_environment(environment, json_output)?;
+            return Ok(Some(format!("Successfully activated environment: {}.", environment)));
         },
 
         ui::TopLevelCommands::Refresh { json_output } => {
             ctr_refresh::refresh(json_output)?;
+            return Ok(Some("The project configuration was refreshed.".to_string()));
         },
 
         ui::TopLevelCommands::Clean { json_output } => {
             ctr_clean::clean(json_output)?;
+            return Ok(Some("Clean command run successfully.".to_string()));
         },
     }
-    Ok(())
+    Ok(None)
 }

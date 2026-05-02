@@ -8,6 +8,7 @@ use crate::model::{
     toolchain_toml, 
     source_code
 };
+use crate::ui;
 use crate::wrapper::cargo;
 
 const DEFAULT_PROJECT_NAME: &str = "project";
@@ -37,6 +38,9 @@ pub fn init_project(
 
     let board_arch = board.platform.to_cargo_arch();
 
+    if !*json_output {
+        ui::display::info("Initiating cargo project...");
+    }
     cargo_init(&proj_path, proj_name, &board_arch, &board.mcu, &board.cargo_feature, &board.rustc_version, hybrid)?;
 
     // TODO - hardcoded
