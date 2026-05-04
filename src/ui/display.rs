@@ -1,3 +1,10 @@
+//! Handles console output formatting, colors, and tables.
+//!
+//! This module centralizes all visual feedback provided to the user. It uses 
+//! `comfy-table` for rendering structured data and `colored` for semantic 
+//! logging (errors, warnings, successes). It also handles JSON serialization 
+//! for external tool integration.
+
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Color, Table};
@@ -6,6 +13,10 @@ use colored::Colorize;
 use crate::model::board::Board;
 use crate::model::device::PioDevice;
 
+/// Prints a formatted, human-readable table of supported boards.
+///
+/// # Arguments
+/// * `boards` - A vector of `Board` structs to display.
 pub fn print_boards_table(boards: &Vec<Board>) {
     let mut table = Table::new();
 
@@ -39,6 +50,10 @@ pub fn print_boards_table(boards: &Vec<Board>) {
     println!("{}", format!("Found {} boards.", table.row_iter().count()).green());
 }
 
+/// Prints a formatted list of connected serial devices.
+///
+/// # Arguments
+/// * `devices` - A vector of `PioDevice` structs representing connected hardware.
 pub fn print_devices_table(devices: &Vec<PioDevice>) {
     for device in devices {
         let hwid = match &device.hwid {
@@ -56,6 +71,10 @@ pub fn print_devices_table(devices: &Vec<PioDevice>) {
     }
 }
 
+/// Prints the supported boards as a raw JSON string.
+/// 
+/// # Arguments
+/// * `boards` - The list of boards.
 pub fn print_boards_json(boards: &Vec<Board>) {
     let json_string = match serde_json::to_string_pretty(boards) {
         Ok(s) => s,
@@ -67,6 +86,10 @@ pub fn print_boards_json(boards: &Vec<Board>) {
     println!("{}", json_string);
 }
 
+/// Prints the connected devices as a raw JSON string.
+/// 
+/// # Arguments
+/// * `devices` - The list of devices.
 pub fn print_devices_json(devices: &Vec<PioDevice>) {
     let json_string = match serde_json::to_string_pretty(devices) {
         Ok(json) => json,
@@ -78,18 +101,34 @@ pub fn print_devices_json(devices: &Vec<PioDevice>) {
     println!("{}", json_string);
 }
 
+/// Prints a standard informational message to the console.
+/// 
+/// # Arguments 
+/// * `msg` - The message to print.
 pub fn info(msg: &str) {
     println!("{}", msg);
 }
 
+/// Prints a success message to the console in green text.
+/// 
+/// # Arguments 
+/// * `msg` - The message to print.
 pub fn success(msg: &str) {
     println!("{}", msg.green());
 }
 
+/// Prints an error message to standard error (`stderr`) in red text.
+/// 
+/// # Arguments 
+/// * `msg` - The message to print.
 pub fn error(msg: &str) {
     eprintln!("{} {}", "Error: ".red().bold(), msg.red());
 }
 
+/// Prints a warning message to standard error (`stderr`) in yellow text.
+/// 
+/// # Arguments 
+/// * `msg` - The message to print.
 pub fn warn(msg: &str) {
     eprintln!("{} {}", "Warning: ".yellow().bold(), msg.yellow());
 }

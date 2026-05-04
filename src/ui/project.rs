@@ -1,6 +1,12 @@
+//! Command-line arguments for project management.
+//!
+//! This module defines the `clap` subcommands used when a user executes 
+//! `prustio project`. It provides the configuration structures for initiating 
+//! new PrustIO projects.
+
 use clap::Subcommand;
 
-// Subcommands for project command
+/// Subcommands available under the `project` command.
 #[derive(Subcommand)]
 pub enum ProjectCommands {
     Init {

@@ -1,3 +1,11 @@
+//! Wrapper for the PlatformIO Core CLI.
+//!
+//! This module acts as the bridge between pRustIO and the PlatformIO ecosystem. 
+//! It is responsible for setting up an isolated Python virtual environment, 
+//! installing the PlatformIO CLI, querying hardware data, and most importantly, 
+//! managing the hidden `pio_workspace` where the Arduino C++ framework is 
+//! compiled into static libraries (`.a` files) for Cargo to link against.
+
 use std::fs::{self, ReadDir};
 use std::io::Error;
 use std::path::PathBuf;
@@ -7,7 +15,9 @@ use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
 use crate::ui::device::{EOL, Parity};
 use crate::utils::{
-    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
+    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, 
+    check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, 
+    get_project_app_dir, get_venv_executable
 };
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";
@@ -15,6 +25,10 @@ const PIO_CORE_DIR_NAME: &str = "pio_core";
 const PIO_SRC_DIR_NAME: &str = "src";
 const PIO_PROJECT_APP_DIR_NAME: &str = ".pio";
 
+/// Checks if PlatformIO is already installed in the local virtual environment.
+///
+/// Returns `true` if the `pio` executable exists within the managed `pio_venv` 
+/// directory, otherwise `false`.
 pub fn check_pio_installation() -> bool {
     let venv_dir = match get_pio_dirs() {
         Ok((venv, _)) => venv,
@@ -23,19 +37,20 @@ pub fn check_pio_installation() -> bool {
     check_venv_executable_existence(&venv_dir, "pio")
 }
 
+/// Queries PlatformIO for a list of supported boards.
+///
+/// # Arguments
+/// * `filter` - A string to filter the board results by ID or name.
 pub fn get_boards(filter: &str) -> std::io::Result<Output> {
     let mut cmd = Command::new("pio");
     return cmd.args(["boards", filter, "--json-output"]).output();
 }
 
+/// Retrieves the paths to the PlatformIO virtual environment and core directories.
+///
+/// # Errors
+/// Returns an error if the home directory cannot be determined or created.
 pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
-    // try to get local application pio dir
-    // let proj_path = match env::current_dir() {
-    //     Ok(path) => path,
-    //     Err(_) => {
-    //         return Err("Failed to get current working directory.".to_string());
-    //     },
-    // };
     // get global application pio dir (in home directory)
     let app_dir = get_app_dir()?;
 
@@ -48,8 +63,16 @@ pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
     return Ok((pio_venv_dir, pio_core_dir));
 }
 
-// TODO check for python existence
+/// Sets up the PlatformIO environment.
+///
+/// Creates a new Python 3 virtual environment and uses `pip` to install the 
+/// `platformio` package. This ensures pRustIO has a reliable, isolated instance 
+/// of PlatformIO regardless of the user's global system configuration.
+///
+/// # Errors
+/// Returns an error if `python3` or `pip` are not available, or if the installation fails.
 pub fn setup_platformio() -> Result<(), String> {
+    // TODO check for python existence
     let (venv_dir, _ ) = get_pio_dirs()?; 
     let venv_status = Command::new("python3")
         .args(["-m", "venv"])
@@ -74,6 +97,13 @@ pub fn setup_platformio() -> Result<(), String> {
     Ok(())
 }
 
+/// Downloads a specific toolchain package via PlatformIO.
+///
+/// # Arguments
+/// * `toolchain_name` - The name of the toolchain package.
+/// 
+/// # Errors
+/// Returns an error when it fails to download the toolchain.
 pub fn download_pio_toolchain(toolchain_name: &str) -> Result<(), String> {
     let (venv_dir, core_dir) = get_pio_dirs()?;
     let args = [
@@ -87,13 +117,20 @@ pub fn download_pio_toolchain(toolchain_name: &str) -> Result<(), String> {
     match run_pio_command(&venv_dir, &core_dir, &args, None) {
         Ok(_) => {},
         Err(_) => {
-            return Err(String::from("PlatformIO failed to install toolchain."));
+            return Err("PlatformIO failed to install toolchain.".to_string());
         } 
     };
     
     Ok(())
 }
 
+/// Downloads a specific hardware platform package via PlatformIO.
+///
+/// # Arguments
+/// * `platform_name` - The name of the platform package.
+/// 
+/// # Errors
+/// Returns an error when it fails to download the platform.
 pub fn download_pio_platform(platform_name: &str) -> Result<(), String> {
     let (venv_dir, core_dir) = get_pio_dirs()?;
     let args = [
@@ -107,13 +144,17 @@ pub fn download_pio_platform(platform_name: &str) -> Result<(), String> {
     match run_pio_command(&venv_dir, &core_dir, &args, None) {
         Ok(_) => {},
         Err(_) => {
-            return Err(String::from("PlatformIO failed to install toolchain."));
+            return Err("PlatformIO failed to install toolchain.".to_string());
         } 
     };
     
     Ok(())
 }
 
+/// Retrieves the raw JSON list of connected hardware devices.
+/// 
+/// # Errors
+/// Returns an error when it fails to run PlatformIO command.
 pub fn get_devices() -> Result<Vec<u8>, String> {
     let (venv_dir, core_dir) = get_pio_dirs()?;
     let args = [
@@ -133,6 +174,16 @@ pub fn get_devices() -> Result<Vec<u8>, String> {
     Ok(output.stdout)
 }
 
+/// Initializes the PlatformIO workspace for compiling C/C++ dependencies.
+///
+/// This function wipes any existing workspace, initializes a new `platformio.ini`, 
+/// and automatically injects the `wrapper.cpp` and `wrapper.h` templates into 
+/// the `src/` directory. These wrappers expose the Arduino framework functions 
+/// to the Rust application via FFI.
+///
+/// # Errors
+/// Returns an error if the workspace directory cannot be managed, PlatformIO fails 
+/// to initialize, or the wrapper files cannot be written.
 pub fn init_compilation_project(
     project_dir: &PathBuf,
     platform: &String,
@@ -194,6 +245,10 @@ pub fn init_compilation_project(
     Ok(())
 }
 
+/// Executes the PlatformIO interactive serial monitor.
+///
+/// Passes standard input/output directly to the terminal, allowing the user to 
+/// interact with their running hardware.
 pub fn device_monitor(
     project_dir: &PathBuf,
     port: &Option<String>, 
@@ -312,6 +367,13 @@ pub fn device_monitor(
     Ok(())
 }
 
+/// Executes `pio pkg list` to retrieve all resolved dependencies for the lockfile.
+/// 
+/// # Arguments
+/// * `project_dir` - The path of the project.
+/// 
+/// # Errors
+/// Returns an error when the PlatformIO project is invalid, or it fails to run the command. 
 pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, String> {
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
@@ -341,6 +403,12 @@ pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, Str
     }
 }
 
+/// Orchestrates the C/C++ framework compilation and library extraction.
+///
+/// Executes `pio run` inside the workspace. Once PlatformIO finishes 
+/// compiling the Arduino framework, this function searches the the `.pio/build` directory,
+/// locates the resulting `.a` static libraries, and copies them to the central  
+/// `built_libs` directory so Cargo can easily link them later.
 pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(), String> {
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
@@ -375,11 +443,6 @@ pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(
         return Err("Missing pio build directory.".to_string());
     }
 
-    // archive the wrapper
-    // let wrapper_obj = pio_build_dir.join("src").join("wrapper.cpp.o");
-    // // let wrapper_lib = compiled_dir.join("libWrapper.a");
-    // // avr::archive_object_file(&wrapper_obj, &wrapper_lib)?;
-
     let wrapper_dir = pio_build_dir.join("src");
     copy_lib_to_dir("wrapper.cpp.o", &wrapper_dir, &compiled_dir)?;
 
@@ -395,7 +458,13 @@ pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(
     Ok(())    
 }
 
-// TODO - made to search for FrameworkArduino too
+/// Recursively searches the PlatformIO build directory for `.a` static libraries.
+/// 
+/// # Arguments
+/// * `build_dir` - The path of directory containing PlatformIO build.
+/// 
+/// # Errors
+/// Returns an error if fails to parse library name, or read the directory entries.
 fn search_libs_in_pio_build(build_dir: &PathBuf) -> Result<Vec<(String, PathBuf)>, String> {
     let entries = get_dir_entries(build_dir)?;
 
@@ -429,6 +498,10 @@ fn search_libs_in_pio_build(build_dir: &PathBuf) -> Result<Vec<(String, PathBuf)
     Ok(lib_paths)
 }
 
+/// Helper function to safely read the entries of a directory.
+/// 
+/// # Errors
+/// Returns an error when it fails to read the given directory content.
 fn get_dir_entries(dir: &PathBuf) -> Result<ReadDir, String> {
     match fs::read_dir(dir) {
         Ok(es) => Ok(es),
@@ -436,6 +509,15 @@ fn get_dir_entries(dir: &PathBuf) -> Result<ReadDir, String> {
     }
 }
 
+/// Copies a specific compiled library or object file into the central linking directory.
+/// 
+/// # Arguments
+/// * `lib_name` - The library name.
+/// * `src_dir` - The path of the directory containing the library.
+/// * `dest_dir` - The path of the directory where the library should be copied.
+/// 
+/// # Errors
+/// Returns an error if the library, source directory, or destination does not exist.
 fn copy_lib_to_dir(lib_name: &str, src_dir: &PathBuf, dest_dir: &PathBuf) -> Result<(), String> {
     let lib = src_dir.join(lib_name);
     if !lib.exists() {
@@ -457,6 +539,19 @@ fn copy_lib_to_dir(lib_name: &str, src_dir: &PathBuf, dest_dir: &PathBuf) -> Res
     Ok(())
 }
 
+/// Executes a PlatformIO command and returns its output (stdout/stderr captured).
+/// 
+/// Automatically sets the `PLATFORMIO_CORE_DIR` environment variable to ensure 
+/// the command uses the isolated internal installation.
+/// 
+/// # Arguments
+/// * `venv_dir` - The path of a virtual environment directory.
+/// * `core_dir` - The path of a PlatformIO core directory.
+/// * `pio_args` - The list of a PlatformIO command arguments.
+/// * `run_dir` - The path of the directory, where command should be run.
+/// 
+/// # Errors
+/// Returns an error if command fails to execute.
 fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], run_dir: Option<&PathBuf>) -> Result<Output, Error> {
     let pio_path = get_venv_executable(venv_dir, "pio");
     match run_dir {
@@ -476,6 +571,18 @@ fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], ru
     }
 }
 
+/// Executes a PlatformIO command directly hooked into the host's terminal (`Stdio::inherit()`).
+/// 
+/// Used primarily for the serial monitor and interactive prompts.
+///
+/// # Arguments
+/// * `venv_dir` - The path of a virtual environment directory.
+/// * `core_dir` - The path of a PlatformIO core directory.
+/// * `pio_args` - The list of a PlatformIO command arguments.
+/// * `run_dir` - The path of the directory, where command should be run.
+/// 
+/// # Errors
+/// Returns an error if command fails to execute.
 fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], run_dir: Option<&PathBuf>) -> Result<ExitStatus, String> {
     let pio_path = get_venv_executable(venv_dir, "pio");
     let mut child = match run_dir {

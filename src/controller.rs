@@ -8,6 +8,7 @@ use crate::wrapper::platformio;
 
 mod ctr_activate;
 mod ctr_board;
+mod ctr_clean;
 mod ctr_device;
 mod ctr_project;
 mod ctr_refresh;
@@ -22,15 +23,24 @@ pub fn execute() -> i32 {
     }
 
     let cli = ui::Cli::parse();
-    if let Err(msg) = run_command(&cli) {
-        display::error(msg.as_str());
-        return 1;
+    match run_command(&cli) {
+        Ok(output) => {
+            if let Some(msg) = output {
+                display::success(msg.as_str());
+            } else {
+                display::success("Successfully executed command.");
+            }
+        },
+        Err(msg) => {
+            display::error(msg.as_str());
+            return 1;
+        }
     }
-    display::success("Successfully executed command.");
+
     return 0;
 }
 
-fn run_command(cli: &ui::Cli) -> Result<(), String> {
+fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
             ctr_board::board(filter.as_ref(), json_output)?;
@@ -41,22 +51,9 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
                 ctr_device::device_list(json_output);
             },
             DeviceCommands::Monitor { 
-                port, 
-                baud, 
-                parity, 
-                rtscts, 
-                xonxoff, 
-                rts, 
-                dtr, 
-                echo, 
-                encoding, 
-                filter, 
-                eol, 
-                raw, 
-                exit_char, 
-                menu_char, 
-                quiet, 
-                no_reconnect 
+                port, baud, parity, rtscts, xonxoff, rts, 
+                dtr, echo, encoding, filter, eol, raw, exit_char, 
+                menu_char, quiet, no_reconnect 
             } => {
                 ctr_device::device_monitor(
                     port, baud, parity, rtscts, xonxoff, rts, dtr, echo, 
@@ -68,6 +65,7 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
         ui::TopLevelCommands::Project { command } => match command {
             ProjectCommands::Init { name, board, hybrid, json_output } => {
                 ctr_project::init_project(name, board, hybrid, json_output)?;
+                return Ok(Some("The project was successfully initialized.".to_string()));
             },
         },
 
@@ -77,11 +75,18 @@ fn run_command(cli: &ui::Cli) -> Result<(), String> {
 
         ui::TopLevelCommands::Activate { environment, json_output } => {
             ctr_activate::activate_environment(environment, json_output)?;
+            return Ok(Some(format!("Successfully activated environment: {}.", environment)));
         },
 
         ui::TopLevelCommands::Refresh { json_output } => {
             ctr_refresh::refresh(json_output)?;
+            return Ok(Some("The project configuration was refreshed.".to_string()));
+        },
+
+        ui::TopLevelCommands::Clean { json_output } => {
+            ctr_clean::clean(json_output)?;
+            return Ok(Some("Clean command run successfully.".to_string()));
         },
     }
-    Ok(())
+    Ok(None)
 }
