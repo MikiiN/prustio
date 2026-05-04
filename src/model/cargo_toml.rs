@@ -1,3 +1,9 @@
+//! Generates and structures the `Cargo.toml` manifest for the embedded project.
+//!
+//! This module constructs the necessary dependencies and build profiles required
+//! to compile `no_std` Rust for AVR microcontrollers. It supports generating 
+//! configurations for both pure Rust environments and hybrid C/C++ builds.
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -6,15 +12,26 @@ const CARGO_TOML_FILE_NAME: &str = "Cargo.toml";
 const DEFAULT_BIN_NAME: &str = "bin";
 const DEFAULT_MAIN_PATH: &str = "src/main.rs";
 
+/// The root structure representing the generated `Cargo.toml` manifest.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CargoToml {
+    /// Basic package metadata (name, version, edition).
     package: PackageConfig,
+    /// Project dependencies.
     dependencies: DependenciesConfig,
+    /// Binary target configurations.
     bin: Vec<BinConfig>,
+    /// Build profile configurations.
     profile: ProfileConfig,
 }
 
 impl CargoToml {
+    /// Constructs a new `Cargo.toml` configuration.
+    ///
+    /// # Arguments
+    /// * `name` - The name of the Cargo package.
+    /// * `feature` - The specific `arduino-hal` hardware feature flag.
+    /// * `hybrid` - Whether the project includes hybrid C/C++ bindings.
     pub fn new(name: &String, feature: &String, hybrid: &bool) -> CargoToml {
         CargoToml { 
             package: PackageConfig::new(name), 
@@ -25,6 +42,7 @@ impl CargoToml {
     }
 }
 
+/// Represents the `[package]` section in `Cargo.toml`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackageConfig {
     pub name: String,
@@ -42,23 +60,31 @@ impl PackageConfig {
     }
 }
 
+/// Represents the `[dependencies]` section in `Cargo.toml`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DependenciesConfig {
     #[serde(rename = "panic-halt")]
+    /// Required for `no_std` panic handling.
     pub panic_halt: String,
-    
+
+    /// Micro-formatted string library for embedded systems.
     pub ufmt: String,
+    /// Non-blocking I/O traits.
     pub nb: String,
     
+    /// Hardware Abstraction Layer traits.
     #[serde(rename = "embedded-hal")]
     pub embedded_hal: String,
     
+    /// The specific AVR hardware abstraction layer.
     #[serde(rename = "arduino-hal")]
     pub arduino_hal: GitHubCrate,
 
+    /// The custom pRustIO Arduino bindings crate (only included in hybrid mode).
     #[serde(rename = "prustio-arduino")]
     pub prustio_arduino: Option<GitHubCrate>,
 
+    /// Build-time dependencies (e.g., for `build.rs`).
     #[serde(rename = "build-dependencies")]
     pub build_dependencies: Option<BuildDependencies>,
 }
@@ -88,7 +114,7 @@ impl DependenciesConfig {
     }
 }
 
-
+/// Represents a Git dependency in `Cargo.toml`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitHubCrate {
     pub git: String,
@@ -110,6 +136,7 @@ impl GitHubCrate {
     }
 }
 
+/// Represents the `[build-dependencies]` section.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BuildDependencies {
     pub fs_extra: String
@@ -121,6 +148,7 @@ impl BuildDependencies {
     }
 }
 
+/// Represents a `[[bin]]` section for configuring executable targets.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BinConfig {
     pub name: String,
@@ -140,6 +168,7 @@ impl BinConfig {
     }
 }
 
+/// Represents the `[profile]` section for build optimizations.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileConfig {
     pub dev: ProfileDevConfig,
@@ -155,6 +184,7 @@ impl ProfileConfig {
     }
 }
 
+/// Represents the `[profile.dev]` section.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileDevConfig {
     pub panic: String,
@@ -173,6 +203,7 @@ impl ProfileDevConfig {
     }
 }
 
+/// Represents the `[profile.release]` section.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileReleaseConfig {
     pub panic: String,
@@ -196,6 +227,19 @@ impl ProfileReleaseConfig {
     }
 }
 
+/// Creates or overwrites the `Cargo.toml` configuration for the project.
+///
+/// Automatically includes required `no_std` crates, configuring the specific 
+/// hardware features based on the selected board.
+///
+/// # Arguments
+/// * `proj_path` - The root directory of the project.
+/// * `project_name` - The name of the crate.
+/// * `board_feature` - The specific `arduino-hal` feature flag.
+/// * `hybrid` - If true, adds dependencies necessary for linking with PlatformIO.
+///
+/// # Errors
+/// Returns an error if the struct cannot be serialized to TOML or if writing to disk fails.
 pub fn create_cargo_toml_config(
     proj_path: &PathBuf, 
     project_name: &String, 

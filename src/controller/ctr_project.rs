@@ -1,3 +1,10 @@
+//! Controller for initiating new pRustIO projects.
+//!
+//! When a user runs the `prustio project init` command, this module handles 
+//! the creation of the project structure. It orchestrates the generation of 
+//! `Cargo.toml`, `.cargo/config.toml`, `rust-toolchain.toml`, `Prustio.toml`, 
+//! and the initial `src/main.rs` template code.
+
 use std::path::PathBuf;
 
 use crate::model::{
@@ -13,6 +20,23 @@ use crate::wrapper::cargo;
 
 const DEFAULT_PROJECT_NAME: &str = "project";
 
+/// Initializes a new pRustIO project in a new directory.
+///
+/// This function verifies that the target directory does not already exist, 
+/// resolves the requested board configuration, and delegates the creation of 
+/// Cargo and pRustIO configuration files to internal helpers.
+///
+/// # Arguments
+/// * `name` - An optional custom name for the project and directory. Defaults to "project".
+/// * `board_id` - An optional hardware board ID. If not provided, an "unspecified" placeholder is used.
+/// * `hybrid` - If `true`, the project is initialized with PlatformIO C/C++ bindings.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+///
+/// # Errors
+/// Returns an error string if:
+/// * A directory or file with the project name already exists.
+/// * An invalid or unsupported `board_id` is provided.
+/// * Writing project configuration fails.
 pub fn init_project(
     name: &Option<String>, 
     board_id: &Option<String>, 
@@ -55,6 +79,15 @@ pub fn init_project(
     Ok(())
 }
 
+/// Sets up the standard Cargo environment and dependencies.
+///
+/// This internally calls the native `cargo init` command and then overrides 
+/// or adds the necessary files (`.cargo/config.toml`, `Cargo.toml`, 
+/// `rust-toolchain.toml`, and `src/main.rs`) to support AVR compilation.
+///
+/// # Errors
+/// Returns an error if the internal native `cargo init` call fails or if 
+/// generating any of the configuration files fails.
 fn cargo_init(
     proj_path: &PathBuf,
     proj_name: &String, 
@@ -77,6 +110,10 @@ fn cargo_init(
     Ok(())
 }
 
+/// Sets up the custom `Prustio.toml` configuration file.
+///
+/// # Errors
+/// Returns an error if writing the `Prustio.toml` file to disk fails.
 fn prustio_init(
     proj_path: &PathBuf, 
     proj_name: &String, 

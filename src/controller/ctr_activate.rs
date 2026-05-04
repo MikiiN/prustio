@@ -1,3 +1,11 @@
+//! Controller for activating a specific environment.
+//!
+//! When a user runs the `prustio activate <env>` command, this module handles 
+//! the transition. It updates the active environment in `Prustio.toml`, 
+//! regenerates the `Cargo.toml` file to inject the correct `arduino-hal` 
+//! features, and modifies `.cargo/config.toml` to reflect the new target 
+//! architecture and MCU.
+
 use std::env;
 
 use crate::model::{prustio_config, board, cargo_toml, cargo_config_toml};
@@ -5,6 +13,20 @@ use crate::ui::display;
 use crate::utils;
 
 
+/// Activates a specific hardware environment within the project.
+///
+/// This function coordinates the updates across the various configuration files 
+/// needed to tell Cargo how to cross-compile for the newly selected board.
+///
+/// # Arguments
+/// * `environment` - A reference to the string name of the environment to activate.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+///
+/// # Errors
+/// Returns an error string if:
+/// * The command is run outside of a valid pRustIO project directory.
+/// * The specified `environment` does not exist in the configuration.
+/// * Reading or writing to `Prustio.toml`, `Cargo.toml`, or `.cargo/config.toml` fails.
 pub fn activate_environment(environment: &String, json_output: &bool) -> Result<(), String> {
     let proj_path = match env::current_dir() {
         Ok(path) => path,

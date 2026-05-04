@@ -1,3 +1,10 @@
+//! Wrapper for the avrdude flashing utility.
+//!
+//! This module handles the process of uploading the compiled `.hex` firmware 
+//! to the connected microcontroller. It interacts with the `avrdude` utility 
+//! provided internally by PlatformIO's package manager, ensuring the user 
+//! doesn't need it installed globally.
+
 use std::{path::PathBuf, process::Command};
 
 use crate::wrapper::platformio;
@@ -5,6 +12,25 @@ use crate::wrapper::platformio;
 const PIO_AVRDUDE_PACKAGE: &str = "tool-avrdude";
 const BINARY_NAME: &str = "avrdude";
 
+/// Uploads a compiled HEX binary to the target microcontroller.
+///
+/// This function locates the internal `avrdude` executable (downloading it via 
+/// PlatformIO if it doesn't exist yet) and constructs the necessary command-line 
+/// arguments to flash the board over a serial port.
+///
+/// # Arguments
+/// * `hex_path` - The absolute path to the compiled HEX firmware file.
+/// * `mcu` - The target microcontroller.
+/// * `platform` - The programmer/upload protocol to use.
+/// * `port` - The serial port the device is connected to.
+/// * `bus_speed` - The baud rate expected by the microcontroller's bootloader.
+///
+/// # Errors
+/// Returns an error string if:
+/// * PlatformIO fails to locate or download the `tool-avrdude` package.
+/// * The path to the HEX file contains invalid characters and cannot be parsed.
+/// * The `avrdude` command fails to execute or returns a non-zero exit status 
+///   (e.g., if the device is disconnected during upload, or the wrong port is selected).
 pub fn upload_binary(
     hex_path: &PathBuf,
     mcu: &String,

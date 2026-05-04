@@ -1,3 +1,14 @@
+//! Controller for building and uploading the project.
+//!
+//! This module acts as the core build engine for pRustIO. When a user executes 
+//! `prustio run`, this controller orchestrates the compilation pipeline:
+//! 1. Resolves the active environment and target board.
+//! 2. In hybrid mode, delegates the C/C++ framework compilation to PlatformIO.
+//! 3. Generates the final Cargo configurations.
+//! 4. Executes the `cargo build` process.
+//! 5. Converts the resulting `.elf` binary into an `.hex` format.
+//! 6. Optionally uploads the firmware to the board via `avrdude`.
+
 use std::env;
 use std::path::PathBuf;
 
@@ -11,6 +22,23 @@ use crate::wrapper::{cargo, avr, avrdude, platformio};
 const DEFAULT_ELF_BIN_NAME: &str = "bin.elf";
 const DEFAULT_HEX_BIN_NAME: &str = "bin.hex"; 
 
+/// Executes the build and/or upload processes for the current project.
+///
+/// This function determines the target(s) and environment, fetches the 
+/// corresponding hardware specifications, and runs the build pipeline.
+///
+/// # Arguments
+/// * `target` - Optional override for the target action (e.g., "build" or "upload"). 
+///   If `None`, it defaults to the targets defined in the active environment.
+/// * `environment` - Optional override for the environment to build. If `None`, 
+///   it uses the active environment from `Prustio.toml`.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+///
+/// # Errors
+/// Returns an error string if:
+/// * Not running inside a valid pRustIO project.
+/// * Configurations fail to load or parse.
+/// * The build or upload tools (Cargo, PlatformIO, AVRDUDE) encounter an error.
 pub fn run(
     target: &Option<String>,
     environment: Option<&String>,
@@ -76,12 +104,14 @@ pub fn run(
     Ok(())
 }
 
+/// Represents the high-level actions that can be taken on a project.
 enum Target {
     Build,
     Upload,
 }
 
 impl Target {
+    /// Parses a string into a `Target` variant.
     fn from(text: &String) -> Result<Target, String> {
         let value = text.to_ascii_lowercase();
         match value.as_str() {
@@ -90,8 +120,9 @@ impl Target {
             _ => Err("Invalid target name.".to_string())
         }
     }
-
-    fn to_string(&self) -> String {
+    
+    /// Converts the `Target` variant into its string representation.
+    fn _to_string(&self) -> String {
         match self {
             Target::Build => "build".to_string(),
             Target::Upload => "upload".to_string(),
@@ -99,6 +130,24 @@ impl Target {
     }
 }
 
+/// Orchestrates the compilation pipeline.
+///
+/// If hybrid mode is active, this function triggers PlatformIO to compile the C++ framework
+/// and prepares the `build.rs` script. It then updates Cargo settings and executes 
+/// the final Rust build.
+/// 
+/// # Arguments
+/// * `proj_path` - The path of the project.
+/// * `package` - The project metadata.
+/// * `board` - The target board parameters.
+/// * `env` - Currently active environment data.
+/// * `board_arch` - The board architecture.
+/// * `elf_bin_path` - The path where the ELF binary file is located.
+/// * `hex_bin_path` - The path where the final HEX binary file should be put.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+///
+/// # Errors
+/// Returns an error if any of the underlying build tools fail.
 fn build_project(
     proj_path: &PathBuf,
     package: &Package,
@@ -153,6 +202,15 @@ fn build_project(
     Ok(())
 }
 
+/// Automates the detection of connected hardware and flashes the compiled firmware.
+///
+/// # Arguments
+/// * `board` - The structure representing the target board.
+/// * `hex_bin_path` - The path of the HEX binary file.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+/// 
+/// # Errors
+/// Returns an error if no target board is connected or if `avrdude` fails.
 fn upload_project(
     board: &Board,
     hex_bin_path: &PathBuf,
@@ -186,10 +244,28 @@ fn upload_project(
     Ok(())
 }
 
+/// Constructs the output directory path for the compiled binaries based on the architecture.
+/// 
+/// # Arguments
+/// * `board_arch` - The architecture of the target board.
 fn get_binary_dir_path(board_arch: &String) -> PathBuf {
     PathBuf::from("target").join(board_arch).join("release")
 }
 
+/// Prepares the C/C++ libraries and `build.rs` script for hybrid mode compilation.
+///
+/// This function initializes a hidden PlatformIO project, extracts required framework 
+/// packages, compiles them into object/archive files, and generates the necessary 
+/// linker instructions for Cargo.
+///
+/// # Arguments
+/// * `proj_dir` - The path of the PrustIO project.
+/// * `board` - The structure representing the target board.
+/// * `env` - Currently active environment.
+/// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
+/// 
+/// # Errors
+/// Returns an error if PlatformIO initialization, compilation, or dependency resolution fails.
 fn prepare_hybrid_mode_compilation(
     proj_dir: &PathBuf,
     board: &Board,

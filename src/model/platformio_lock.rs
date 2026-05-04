@@ -1,3 +1,10 @@
+//! Manages the `platformio.lock` dependency tracking file.
+//!
+//! To ensure reproducible builds in hybrid mode, `pRustIO` captures the exact 
+//! versions of all frameworks, libraries, and tools resolved by PlatformIO. 
+//! This module parses the output of `pio pkg list`, categorizes the dependencies, 
+//! and serializes them into a `platformio.lock` TOML file in the project directory.
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -5,6 +12,7 @@ use std::path::PathBuf;
 
 const FILE_NAME: &str = "platformio.lock";
 
+/// Represents the classification of a PlatformIO dependency.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Category {
     Platform,
@@ -13,29 +21,47 @@ pub enum Category {
     Library,
 }
 
+/// Represents a single pinned dependency.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Dependency {
+    /// The name of the package.
     pub name: String,
+    /// The version string.
     pub version: String,
+    /// The classification of the package.
     pub category: Category,
 }
 
+/// The root structure representing the `platformio.lock` file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Lockfile {
     pub version: u8,
+    /// The list of all locked dependencies.
     pub dependencies: Vec<Dependency>,
 }
 
 impl Lockfile {
+    /// Creates a new `Lockfile` instance in memory.
     pub fn new(dependencies: Vec<Dependency>, version: u8) -> Lockfile {
         Lockfile { version, dependencies }
     }
 
+    /// Updates the existing dependencies and increments the lockfile version.
+    /// 
+    /// # Arguments
+    /// * `dependencies` - The list of the current PlatformIO project dependencies. 
     pub fn update(&mut self, dependencies: Vec<Dependency>) {
         self.version += 1;
         self.dependencies = dependencies;
     }
 
+    /// Loads and parses a `platformio.lock` file from the project directory.
+    ///
+    /// # Arguments
+    /// * `proj_dir` - The root directory of the `pRustIO` project.
+    ///
+    /// # Errors
+    /// Returns an error if the lockfile does not exist, cannot be read, or contains invalid TOML.
     pub fn load(proj_dir: &PathBuf) -> Result<Lockfile, String> {
         let lock_path = proj_dir.join(FILE_NAME);
         if !lock_path.exists() {
@@ -55,6 +81,9 @@ impl Lockfile {
         }
     }
 
+    /// Formats the locked framework dependencies for injection into `platformio.ini`.
+    ///
+    /// Returns a list of strings formatted as `\n    <name> @ <version>`.
     pub fn get_platform_packages(&self) -> Vec<String> {
         self.dependencies
             .iter()
@@ -63,6 +92,9 @@ impl Lockfile {
             .collect()
     }
 
+    /// Formats the locked library dependencies for injection into `platformio.ini`.
+    ///
+    /// Returns a list of strings formatted as `\n    <name> @ <version>`.
     pub fn get_lib_deps(&self) -> Vec<String> {
         self.dependencies
             .iter()
@@ -71,6 +103,13 @@ impl Lockfile {
             .collect()
     }
 
+    /// Serializes the lockfile to TOML and saves it to disk.
+    ///
+    /// # Arguments
+    /// * `proj_dir` - The root directory of the `pRustIO` project.
+    ///
+    /// # Errors
+    /// Returns an error string if serialization or file writing fails.
     pub fn save(&self, proj_dir: &PathBuf) -> Result<(), String> {
         let lock_path = proj_dir.join(FILE_NAME);
         let toml_string = toml::to_string_pretty(self)
@@ -80,10 +119,23 @@ impl Lockfile {
     }
 }
 
+/// Helper function to retrieve the standard path for the `platformio.lock` file.
 pub fn get_pio_lock_path(proj_dir: &PathBuf) -> PathBuf { 
     proj_dir.join(FILE_NAME)
 }
 
+/// Parses the standard output of the `pio pkg list` command to extract dependency data.
+///
+/// This function uses a regular expression to match `<package_name> @ <version>` 
+/// and categorizes the dependency based on contextual clues (like section headers 
+/// or naming prefixes).
+///
+/// # Arguments
+/// * `stdout` - The raw string output from the PlatformIO command line.
+///
+/// # Errors
+/// Returns an error if the regular expression fails to compile or if critical 
+/// capture groups are unexpectedly missing.
 pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<Dependency>, String> {
     let package_regex = match Regex::new(r"([a-zA-Z0-9\-_/]+)\s+@\s+([a-zA-Z0-9\.\-\+]+)") {
         Ok(regex) => regex,

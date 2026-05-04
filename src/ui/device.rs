@@ -1,13 +1,21 @@
+//! Command-line arguments for device management.
+//!
+//! This module defines the `clap` subcommands and arguments used when a user
+//! executes `prustio device`. It provides the configuration structures for 
+//! listing connected hardware and configuring the interactive serial monitor.
+
 use clap::{Subcommand, ValueEnum};
 
-// Subcommands for device command
+/// Subcommands available under the `device` command.
 #[derive(Subcommand)]
 pub enum DeviceCommands {
+    /// Lists all connected serial devices and microcontrollers.
     List {
         #[arg(long)]
         json_output: bool,
     },
 
+    /// Opens an interactive serial monitor to communicate with a connected device.
     Monitor {
         #[arg(long, short)]
         port: Option<String>,
@@ -59,6 +67,7 @@ pub enum DeviceCommands {
     }
 }
 
+/// Represents the parity check mode for serial communication.
 #[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum Parity {
     #[value(name = "N")]
@@ -74,6 +83,7 @@ pub enum Parity {
 }
 
 impl Parity {
+    /// Converts the parity enum variant into its string representation.
     pub fn to_string(&self) -> String {
         match self {
             Parity::N => "N".to_string(),
@@ -85,6 +95,7 @@ impl Parity {
     }
 }
 
+/// Represents the End-Of-Line (EOL) sequence for serial output.
 #[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum EOL {
     #[value(name = "CR")]
@@ -96,6 +107,7 @@ pub enum EOL {
 }
 
 impl EOL {
+    /// Converts the EOL enum variant into its string representation.
     pub fn to_string(&self) -> String {
         match self {
             EOL::CR => "CR".to_string(),
