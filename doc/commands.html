@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Commands - pRustIO Guide</title>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>pRustIO Guide</h2>
+        <ul>
+            <li><a href="index.html">Introduction</a></li>
+            <li><a href="installation.html">Installation</a></li>
+            <li><a href="commands.html" class="active">Commands</a></li>
+            <li><a href="examples.html">Examples</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1>Commands</h1>
+        <p>Here is a complete list of commands and their options that you can use to manage your embedded projects.</p>
+
+        <h2>Project Management</h2>
+
+        <h3>Creating a Project</h3>
+        <p>Creates all the necessary setup files and a basic starting code file.</p>
+        <pre><code>prustio project init [PROJECT_NAME] [OPTIONS]</code></pre>
+        <ul>
+            <li><code>[PROJECT_NAME]</code>: (Optional) The name of your new project.</li>
+            <li><code>-b, --board &lt;BOARD&gt;</code>: Specify the target board (e.g., <code>uno</code>, <code>nano</code>).</li>
+            <li><code>--hybrid</code>: Create a hybrid project that uses Arduino C++ functions.</li>
+            <li><code>--json-output</code>: Print the output in JSON format (useful for scripts).</li>
+        </ul>
+
+        <h3>Cleaning a Project</h3>
+        <p>Deletes the created build files to save disk space or start a fresh build.</p>
+        <pre><code>prustio clean [OPTIONS]</code></pre>
+        <ul>
+            <li><code>--json-output</code>: Print the output in JSON format.</li>
+        </ul>
+
+        <h2>Building and Uploading</h2>
+        <p>The <code>run</code> command checks your setup, compiles the code, and uploads it to the board.</p>
+        <pre><code>prustio run [OPTIONS]</code></pre>
+        <ul>
+            <li><code>-t, --target &lt;TARGET&gt;</code>: Choose what to do. Use <code>build</code> to only compile the code, or <code>upload</code> to compile and send it to the board (default).</li>
+            <li><code>-e, --environment &lt;ENVIRONMENT&gt;</code>: Build for a specific environment if you have more than one.</li>
+            <li><code>--json-output</code>: Print the output in JSON format.</li>
+        </ul>
+
+        <h2>Device & Serial Monitor</h2>
+
+        <h3>Finding Connected Devices</h3>
+        <p>Check which microcontrollers and serial devices are connected to your computer:</p>
+        <pre><code>prustio device list [OPTIONS]</code></pre>
+        <ul>
+            <li><code>--json-output</code>: Print the device list in JSON format.</li>
+        </ul>
+
+        <h3>Interactive Serial Monitor</h3>
+        <p>Open the built-in serial monitor to communicate with your device.</p>
+        <pre><code>prustio device monitor [OPTIONS]</code></pre>
+        <ul>
+            <li><code>-p, --port &lt;PORT&gt;</code>: The specific serial port to connect to (e.g., <code>/dev/ttyACM0</code>).</li>
+            <li><code>-b, --baud &lt;BAUD&gt;</code>: The communication speed (e.g., <code>115200</code>).</li>
+            <li><code>--parity &lt;PARITY&gt;</code>: Parity check mode (Accepts: <code>N</code>, <code>E</code>, <code>O</code>, <code>S</code>, <code>M</code>. Default is <code>N</code>).</li>
+            <li><code>--rtscts</code>: Enable hardware flow control.</li>
+            <li><code>--xonxoff</code>: Enable software flow control.</li>
+            <li><code>--rts &lt;RTS&gt;</code>: Set the RTS pin state (0 or 1).</li>
+            <li><code>--dtr &lt;DTR&gt;</code>: Set the DTR pin state (0 or 1).</li>
+            <li><code>--echo</code>: Show what you type in the terminal.</li>
+            <li><code>--encoding &lt;ENCODING&gt;</code>: The text encoding to use (Default is <code>UTF-8</code>).</li>
+            <li><code>-f, --filter &lt;FILTER&gt;</code>: Apply a text filter to the output.</li>
+            <li><code>--eol &lt;EOL&gt;</code>: End of line characters (Accepts: <code>CR</code>, <code>LF</code>, <code>CRLF</code>. Default is <code>CRLF</code>).</li>
+            <li><code>--raw</code>: Do not format the output.</li>
+            <li><code>--exit-char &lt;EXIT_CHAR&gt;</code>: ASCII code for the exit shortcut (Default is <code>3</code>, which is Ctrl+C).</li>
+            <li><code>--menu-char &lt;MENU_CHAR&gt;</code>: ASCII code for the menu shortcut (Default is <code>20</code>).</li>
+            <li><code>--quiet</code>: Do not show extra connection messages.</li>
+            <li><code>--no-reconnect</code>: Do not automatically try to reconnect if the device disconnects.</li>
+        </ul>
+
+        <h2>Environment Management</h2>
+
+        <h3>Activating an Environment</h3>
+        <p>Change the active board. This updates the settings for the new hardware.</p>
+        <pre><code>prustio activate &lt;ENVIRONMENT_NAME&gt; [OPTIONS]</code></pre>
+        <ul>
+            <li><code>&lt;ENVIRONMENT_NAME&gt;</code>: (Required) The name of the environment to activate.</li>
+            <li><code>--json-output</code>: Print the output in JSON format.</li>
+        </ul>
+
+        <h3>Updating Settings</h3>
+        <p>If you change your <code>Prustio.toml</code> file manually, force pRustIO to update the project settings to match:</p>
+        <pre><code>prustio refresh [OPTIONS]</code></pre>
+        <ul>
+            <li><code>--json-output</code>: Print the output in JSON format.</li>
+        </ul>
+
+        <h2>Other Commands</h2>
+
+        <h3>List Supported Boards</h3>
+        <p>See all the microcontrollers that pRustIO supports.</p>
+        <pre><code>prustio boards [FILTER] [OPTIONS]</code></pre>
+        <ul>
+            <li><code>[FILTER]</code>: (Optional) Search for a specific board name (e.g., <code>nano</code>).</li>
+            <li><code>--json-output</code>: Print the output in JSON format.</li>
+        </ul>
+
+    </main>
+
+</body>
+</html>

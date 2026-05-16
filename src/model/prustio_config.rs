@@ -32,12 +32,18 @@ impl Configuration {
     /// # Errors
     /// Returns an error if the string cannot be parsed into the expected TOML format.
     pub fn from(content: &String) -> Result<Configuration, String> {
-        let config: Configuration = match toml_edit::de::from_str(content) {
+        let mut config: Configuration = match toml_edit::de::from_str(content) {
             Ok(c) => c,
             Err(_) => {
                 return Err(String::from("Failed to parse PrustIO configuration file."));
             }
         };
+
+        if let Some(ref mut env_tree) = config.env {
+            for (env_name, env_cofing) in env_tree.iter_mut() {
+                env_cofing.name = env_name.clone();
+            }
+        }
 
         Ok(config)
     }
@@ -126,7 +132,7 @@ impl Package {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Env {
     /// The name of environment.
-    #[serde(skip, default)]
+    #[serde(skip)]
     pub name: String,
 
     /// The list of default targets for `prustio run` command.

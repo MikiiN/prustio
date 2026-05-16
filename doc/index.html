@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Introduction - pRustIO Guide</title>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>pRustIO Guide</h2>
+        <ul>
+            <li><a href="index.html" class="active">Introduction</a></li>
+            <li><a href="installation.html">Installation</a></li>
+            <li><a href="commands.html">Commands</a></li>
+            <li><a href="examples.html">Examples</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1>Introduction</h1>
+        <p>
+            <strong>pRustIO</strong> is a Command-Line Interface (CLI) tool that makes it easier to develop embedded projects using Rust. It can connects the Rust <code>cargo</code> build system with the C/C++ embedded world by automatically linking the Arduino framework to the application.
+        </p>
+
+        <h2>Core Concepts</h2>
+        <p>pRustIO has two different build modes, depending on what you need for your project:</p>
+        <ul>
+            <li>
+                <strong>Pure Mode (Default):</strong> Works completely inside the Rust system using the <code>arduino-hal</code> library. It does not use any extra C or C++ code. This gives you smaller and memory safe applications.
+            </li>
+            <li>
+                <strong>Hybrid Mode (<code>--hybrid</code>):</strong> Sets up your project to use the standard Arduino C++ framework. pRustIO creates a hidden PlatformIO workspace, compiles the C/C++ libraries, and allows you to use Arduino functions (like <code>pinMode</code> and <code>digitalWrite</code>) in your Rust code using the <code>prustio-arduino</code> crate.
+            </li>
+        </ul>
+
+        <h2>Supported Boards</h2>
+        <p>pRustIO supports many popular Arduino and AVR boards. You can see the full list directly from your command line using the tool.</p>
+        <pre><code># Show all supported boards
+prustio boards
+
+# Search for a specific board (e.g., nano)
+prustio boards nano</code></pre>
+        <p>Commonly supported boards include the <strong>Uno</strong>, <strong>Nano</strong>, <strong>Mega 2560</strong>, <strong>Leonardo</strong>, and <strong>Micro</strong>.</p>
+    </main>
+
+</body>
+</html>
