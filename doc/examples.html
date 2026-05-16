@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Examples - pRustIO Guide</title>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>pRustIO Guide</h2>
+        <ul>
+            <li><a href="index.html">Introduction</a></li>
+            <li><a href="installation.html">Installation</a></li>
+            <li><a href="commands.html">Commands</a></li>
+            <li><a href="examples.html" class="active">Examples</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1>Application Examples</h1>
+        <p>The examples below show how to build applications using <strong>Pure Rust mode</strong>. This mode uses the <code>arduino-hal</code> crate to communicate with the microcontroller safely.</p>
+
+        <h2>1. Blinking an LED (Digital Output)</h2>
+        <p>This is the basic starting code. It takes control of the device hardware and turns the built-in LED (usually pin 13) on and off.</p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    // Get the device hardware
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    // Set pin D13 as a digital output
+    let mut led = pins.d13.into_output();
+
+    loop {
+        led.toggle();
+        arduino_hal::delay_ms(1000);
+    }
+}</code></pre>
+
+        <h2>2. Reading a Button (Digital Input)</h2>
+        <p>This example shows how to read a digital input. When you press the button (on pin 2), it connects to ground (LOW) and turns on the LED.</p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    let mut led = pins.d13.into_output();
+
+    // Set pin 2 as an input and turn on the internal pull-up resistor
+    let button = pins.d2.into_pull_up_input();
+
+    loop {
+        // When the button is pressed, the signal is LOW
+        if button.is_low() {
+            led.set_high(); // Turn LED on
+        } else {
+            led.set_low();  // Turn LED off
+        }
+    }
+}</code></pre>
+
+        <h2>3. Serial Communication (UART)</h2>
+        <p>To send text to the serial monitor, Pure Rust uses the <code>ufmt</code> library and <code>arduino_hal::default_serial!</code>.</p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+use ufmt::uwriteln;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    // Start serial communication at 9600 baud rate
+    let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
+
+    let mut counter: u32 = 0;
+
+    loop {
+        // Use `uwriteln!` to print text and numbers
+        uwriteln!(&amp;mut serial, "Hello from Pure Rust! Count: {}\r", counter).void_unwrap();
+
+        counter = counter.wrapping_add(1);
+        arduino_hal::delay_ms(1000);
+    }
+}</code></pre>
+
+        <h2>4. Reading Analog Sensors (ADC)</h2>
+        <p>This code sets up the Analog-to-Digital Converter (ADC). It reads values from a sensor connected to pin A0 and prints the result to the serial monitor.</p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+use ufmt::uwriteln;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    let mut serial = arduino_hal::default_serial!(dp, pins, 57600);
+
+    // Start the ADC
+    let mut adc = arduino_hal::Adc::new(dp.ADC, Default::default());
+
+    // Set pin A0 as an analog input
+    let a0 = pins.a0.into_analog_input(&amp;mut adc);
+
+    loop {
+        // Read the analog value (0-1023)
+        let sensor_value = a0.analog_read(&amp;mut adc);
+
+        uwriteln!(&amp;mut serial, "Analog Reading: {}\r", sensor_value).void_unwrap();
+        arduino_hal::delay_ms(500);
+    }
+}</code></pre>
+
+        <h2>5. Fading an LED (PWM)</h2>
+        <p>
+            You can use Pulse Width Modulation (PWM) to change the brightness of an LED. Instead of just turning it on or off, PWM turns it on and off very fast to create a fading effect. This example uses a hardware timer to fade an LED connected to pin D9.
+        </p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    // Set up a hardware timer for PWM
+    let timer1 = arduino_hal::simple_pwm::Timer1Pwm::new(
+        dp.TC1,
+        arduino_hal::simple_pwm::Prescaler::Prescale64
+    );
+
+    // Set pin D9 as a PWM output
+    let mut pwm_led = pins.d9.into_output().into_pwm(&amp;timer1);
+
+    // Turn on the PWM signal
+    pwm_led.enable();
+
+    loop {
+        // Fade in (increase brightness)
+        for duty in 0..=255 {
+            pwm_led.set_duty(duty);
+            arduino_hal::delay_ms(10);
+        }
+
+        // Fade out (decrease brightness)
+        for duty in (0..=255_u8).rev() {
+            pwm_led.set_duty(duty);
+            arduino_hal::delay_ms(10);
+        }
+    }
+}</code></pre>
+
+        <h2>6. Finding Connected Devices (I2C Scanner)</h2>
+        <p>
+            I2C is a popular way to connect sensors and displays using just two wires (SDA and SCL). This example sets up the I2C bus and scans all possible addresses to find connected devices. It prints the addresses of any devices it finds to the serial monitor.
+        </p>
+        <pre><code>#![no_std]
+#![no_main]
+
+use panic_halt as _;
+use ufmt::uwriteln;
+
+#[arduino_hal::entry]
+fn main() -&gt; ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+
+    let mut serial = arduino_hal::default_serial!(dp, pins, 57600);
+
+    // Set up I2C using pins A4 (SDA) and A5 (SCL)
+    // The speed is set to 50,000 Hz
+    let mut i2c = arduino_hal::I2c::new(
+        dp.TWI,
+        pins.a4.into_pull_up_input(),
+        pins.a5.into_pull_up_input(),
+        50000,
+    );
+
+    uwriteln!(&amp;mut serial, "Starting I2C Scan...\\r").void_unwrap();
+
+    loop {
+        let mut found_any = false;
+
+        // Check all standard I2C addresses (from 1 to 127)
+        for addr in 1..128 {
+            let mut buffer = [0; 1];
+
+            // Try to read one byte from the address
+            match i2c.read(addr, &amp;mut buffer) {
+                Ok(_) =&gt; {
+                    uwriteln!(&amp;mut serial, "Found device at address: {}\\r", addr).void_unwrap();
+                    found_any = true;
+                },
+                Err(_) =&gt; {
+                    // No device found at this address
+                }
+            }
+        }
+
+        if !found_any {
+            uwriteln!(&amp;mut serial, "No I2C devices found.\\r").void_unwrap();
+        }
+
+        uwriteln!(&amp;mut serial, "Scan complete. Waiting 5 seconds...\\r\\n").void_unwrap();
+        arduino_hal::delay_ms(5000);
+    }
+}</code></pre>
+
+    </main>
+
+</body>
+</html>
