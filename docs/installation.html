@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>Installation - pRustIO Guide</title>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>pRustIO Guide</h2>
+        <ul>
+            <li><a href="index.html">Introduction</a></li>
+            <li><a href="installation.html" class="active">Installation</a></li>
+            <li><a href="commands.html">Commands</a></li>
+            <li><a href="examples.html">Examples</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <h1>Installation</h1>
+        <p>Before you install pRustIO, make sure your computer meets a few basic requirements.</p>
+
+        <h2>Prerequisites</h2>
+        <ul>
+            <li><strong>Rust and Cargo:</strong> You must have the Rust programming language and Cargo installed. (Usually installed via <code>rustup</code>).</li>
+            <li><strong>Python 3:</strong> pRustIO uses Python 3 to automatically download and run a local version of PlatformIO. Make sure Python 3 is available in your system path.</li>
+        </ul>
+
+        <h2>Installing pRustIO CLI</h2>
+        <p>Because pRustIO is a standard Rust application, you can install it using Cargo from the project repository or directly from crates.io.</p>
+
+        <p>From repository: </p>
+        <pre><code># Clone the repository
+git clone &lt;repository_url&gt;
+cd prustio
+
+# Install the tool globally using Cargo
+cargo install --path .</code></pre>
+
+        <p>From crates.io:</p>
+        <pre><code>cargo install prustio</code></pre>
+
+        <p>After installation, verify that the tool works by typing:</p>
+        <pre><code>prustio --version</code></pre>
+
+        <h2>Installing pRustIO Visual Studio Code extension</h2>
+        <p>If you don't like a comand-line interface, you can use pRustIO in the form of VS Code extension. Simply search pRustIO in the VS Code extensions marketplace and install it. The extension will download all missing dependencies or ask you to download it.</p>
+
+        <h2>Automatic Setup</h2>
+        <p>
+            You do <strong>not</strong> need to manually install PlatformIO, AVRDUDE, or the <code>avr-gcc</code> compiler.
+            The first time you run a pRustIO command, the tool will automatically create a private Python virtual environment in your home directory (<code>~/.prustio/</code>) and download everything it needs.
+        </p>
+    </main>
+
+</body>
+</html>
