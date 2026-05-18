@@ -5,6 +5,7 @@
 //! configurations for both pure Rust environments and hybrid C/C++ builds.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -18,7 +19,7 @@ pub struct CargoToml {
     /// Basic package metadata (name, version, edition).
     package: PackageConfig,
     /// Project dependencies.
-    dependencies: DependenciesConfig,
+    dependencies: BTreeMap<String, toml::Value>,
     /// Binary target configurations.
     bin: Vec<BinConfig>,
     /// Build profile configurations.
@@ -32,11 +33,47 @@ impl CargoToml {
     /// * `name` - The name of the Cargo package.
     /// * `feature` - The specific `arduino-hal` hardware feature flag.
     /// * `hybrid` - Whether the project includes hybrid C/C++ bindings.
-    pub fn new(name: &String, feature: &String, hybrid: &bool) -> CargoToml {
+    /// * `user_dependencies` - Extra dependencies from `Prustio.toml`.
+    pub fn new(
+        name: &String, 
+        feature: &String, 
+        hybrid: &bool,
+        user_dependencies: Option<&BTreeMap<String, toml::Value>>
+    ) -> CargoToml {
+        let mut deps = BTreeMap::new();
+        
+        // standard built-in dependencies
+        deps.insert("panic-halt".to_string(), toml::Value::String("1.0.0".to_string()));
+        deps.insert("ufmt".to_string(), toml::Value::String("0.2.0".to_string()));
+        deps.insert("nb".to_string(), toml::Value::String("1.1.0".to_string()));
+        deps.insert("embedded-hal".to_string(), toml::Value::String("1.0".to_string()));
+        
+        let mut hal_map = toml::map::Map::new();
+        hal_map.insert("git".to_string(), toml::Value::String("https://github.com/rahix/avr-hal".to_string()));
+        hal_map.insert("rev".to_string(), toml::Value::String("e5c8f37fe48419956e722490a82b9ca9b9fc61a2".to_string()));
+        hal_map.insert("features".to_string(), toml::Value::Array(vec![toml::Value::String(feature.clone())]));
+        deps.insert("arduino-hal".to_string(), toml::Value::Table(hal_map));
+
+        // add interface crate if in hybrid mode
+        if *hybrid {
+            let mut prustio_map = toml::map::Map::new();
+            prustio_map.insert("git".to_string(), toml::Value::String("https://github.com/MikiiN/prustio-arduino-crate".to_string()));
+            deps.insert("prustio-arduino".to_string(), toml::Value::Table(prustio_map));
+        }
+
+        // merge user dependencies
+        if let Some(user_deps) = user_dependencies {
+            println!("{:?}", user_deps);
+            for (key, val) in user_deps {
+                deps.insert(key.clone(), val.clone());
+            }
+        }
+        println!("{:?}", deps);
+
         CargoToml { 
             package: PackageConfig::new(name), 
-            dependencies: DependenciesConfig::new(feature, hybrid), 
-            bin: Vec::from([BinConfig::new()]), 
+            dependencies: deps, 
+            bin: vec![BinConfig::new()], 
             profile: ProfileConfig::new(), 
         }
     }
@@ -57,94 +94,6 @@ impl PackageConfig {
             version: "0.1.0".to_string(),
             edition: "2024".to_string(),
         }
-    }
-}
-
-/// Represents the `[dependencies]` section in `Cargo.toml`.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DependenciesConfig {
-    #[serde(rename = "panic-halt")]
-    /// Required for `no_std` panic handling.
-    pub panic_halt: String,
-
-    /// Micro-formatted string library for embedded systems.
-    pub ufmt: String,
-    /// Non-blocking I/O traits.
-    pub nb: String,
-    
-    /// Hardware Abstraction Layer traits.
-    #[serde(rename = "embedded-hal")]
-    pub embedded_hal: String,
-    
-    /// The specific AVR hardware abstraction layer.
-    #[serde(rename = "arduino-hal")]
-    pub arduino_hal: GitHubCrate,
-
-    /// The custom pRustIO Arduino bindings crate (only included in hybrid mode).
-    #[serde(rename = "prustio-arduino")]
-    pub prustio_arduino: Option<GitHubCrate>,
-
-    /// Build-time dependencies (e.g., for `build.rs`).
-    #[serde(rename = "build-dependencies")]
-    pub build_dependencies: Option<BuildDependencies>,
-}
-
-impl DependenciesConfig {
-    pub fn new(feature: &String, hybrid: &bool) -> DependenciesConfig {
-        DependenciesConfig { 
-            panic_halt: "1.0.0".to_string(), 
-            ufmt: "0.2.0".to_string(), 
-            nb: "1.1.0".to_string(), 
-            embedded_hal: "1.0".to_string(), 
-            arduino_hal: GitHubCrate::new(
-                "https://github.com/rahix/avr-hal".to_string(), 
-                Some("e5c8f37fe48419956e722490a82b9ca9b9fc61a2".to_string()), 
-                Some(Vec::from([feature.clone()]))
-            ),
-            prustio_arduino: if *hybrid {
-                Some(GitHubCrate::new(
-                "https://github.com/MikiiN/prustio-arduino-crate".to_string(), 
-                None, 
-                None
-                ))
-            } else { None },
-            build_dependencies: None
-        }
-
-    }
-}
-
-/// Represents a Git dependency in `Cargo.toml`.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GitHubCrate {
-    pub git: String,
-    pub rev: Option<String>,
-    pub features: Option<Vec<String>>
-}
-
-impl GitHubCrate {
-    pub fn new(
-        git: String,
-        rev: Option<String>,
-        features: Option<Vec<String>>
-    ) -> GitHubCrate {
-        GitHubCrate { 
-            git: git.clone(), 
-            rev: rev,
-            features: features
-        }
-    }
-}
-
-/// Represents the `[build-dependencies]` section.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BuildDependencies {
-    pub fs_extra: String
-}
-
-impl BuildDependencies {
-    pub fn new() -> BuildDependencies {
-        BuildDependencies { fs_extra: "1.3".to_string() }
     }
 }
 
@@ -237,6 +186,7 @@ impl ProfileReleaseConfig {
 /// * `project_name` - The name of the crate.
 /// * `board_feature` - The specific `arduino-hal` feature flag.
 /// * `hybrid` - If true, adds dependencies necessary for linking with PlatformIO.
+/// * `user_dependencies` - Dependencies loaded from `Prustio.toml`.
 ///
 /// # Errors
 /// Returns an error if the struct cannot be serialized to TOML or if writing to disk fails.
@@ -245,10 +195,11 @@ pub fn create_cargo_toml_config(
     project_name: &String, 
     board_feature: &String,
     hybrid: &bool,
+    user_dependencies: Option<&BTreeMap<String, toml::Value>>,
 ) -> Result<(), String> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
     
-    let config = CargoToml::new(project_name, board_feature, hybrid);
+    let config = CargoToml::new(project_name, board_feature, hybrid, user_dependencies);
 
     let content = match toml::to_string_pretty(&config) {
         Ok(c) => c,
@@ -277,21 +228,27 @@ mod tests {
 
     #[test]
     fn test_cargo_toml_generation_pure_mode() {
-        let cargo = CargoToml::new(&"pure_app".to_string(), &"arduino-uno".to_string(), &false);
+        let cargo = CargoToml::new(&"pure_app".to_string(), &"arduino-uno".to_string(), &false, None);
         
         assert_eq!(cargo.package.name, "pure_app");
-        // Ensure prustio_arduino is NOT included in pure mode
-        assert!(cargo.dependencies.prustio_arduino.is_none());
-        // Check hardware abstraction layer features
-        assert_eq!(cargo.dependencies.arduino_hal.features, Some(vec!["arduino-uno".to_string()]));
+        // ensure prustio_arduino is not included in pure mode
+        assert!(cargo.dependencies.get("prustio-arduino").is_none());
+        
+        // Check hardware abstraction layer features via the Map
+        let hal = cargo.dependencies.get("arduino-hal").unwrap().as_table().unwrap();
+        let features = hal.get("features").unwrap().as_array().unwrap();
+        assert_eq!(features[0].as_str().unwrap(), "arduino-uno");
     }
 
     #[test]
     fn test_cargo_toml_generation_hybrid_mode() {
-        let cargo = CargoToml::new(&"hybrid_app".to_string(), &"arduino-mega2560".to_string(), &true);
+        let cargo = CargoToml::new(&"hybrid_app".to_string(), &"arduino-mega2560".to_string(), &true, None);
         
-        // Ensure prustio_arduino IS included in hybrid mode
-        assert!(cargo.dependencies.prustio_arduino.is_some());
-        assert_eq!(cargo.dependencies.arduino_hal.features, Some(vec!["arduino-mega2560".to_string()]));
+        // ensure prustio_arduino is included in hybrid mode
+        assert!(cargo.dependencies.get("prustio-arduino").is_some());
+        
+        let hal = cargo.dependencies.get("arduino-hal").unwrap().as_table().unwrap();
+        let features = hal.get("features").unwrap().as_array().unwrap();
+        assert_eq!(features[0].as_str().unwrap(), "arduino-mega2560");
     }
 }

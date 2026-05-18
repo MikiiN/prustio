@@ -47,12 +47,14 @@ pub fn activate_environment(environment: &String, json_output: &bool) -> Result<
     config.save(&proj_path)?;
     
     let board = board::get_board(&env.board)?;
-    
+    let user_dependencies = config.get_user_defined_dependencies();
+
     cargo_toml::create_cargo_toml_config(
         &proj_path, 
         &package.name, 
         &board.cargo_feature, 
-        &package.hybrid_mode
+        &package.hybrid_mode,
+        user_dependencies,
     )?;
 
     let board_arch = board.platform.to_cargo_arch();

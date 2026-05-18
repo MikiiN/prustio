@@ -9,6 +9,7 @@
 //! 5. Converts the resulting `.elf` binary into an `.hex` format.
 //! 6. Optionally uploads the firmware to the board via `avrdude`.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
 
@@ -88,13 +89,21 @@ pub fn run(
     config.set_active_env(&env.name)?;
     config.save(&proj_path)?;
 
+    let user_dependencies = config.get_user_defined_dependencies();
+
     for t in targets {
         match t {
             Target::Build => {
-                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path, json_output)?;
+                build_project(
+                    &proj_path, &package, &board, &env, user_dependencies, 
+                    &board_arch, &elf_bin_path, &hex_bin_path, json_output
+                )?;
             },
             Target::Upload => {
-                build_project(&proj_path, &package, &board, &env, &board_arch, &elf_bin_path, &hex_bin_path, json_output)?;
+                build_project(
+                    &proj_path, &package, &board, &env, user_dependencies, 
+                    &board_arch, &elf_bin_path, &hex_bin_path, json_output
+                )?;
                 upload_project(&board, &hex_bin_path, json_output)?;
             }
         }
@@ -141,6 +150,7 @@ impl Target {
 /// * `package` - The project metadata.
 /// * `board` - The target board parameters.
 /// * `env` - Currently active environment data.
+/// * `user_dependencies` - Dependencies defined by the user in `Prustio.toml`.
 /// * `board_arch` - The board architecture.
 /// * `elf_bin_path` - The path where the ELF binary file is located.
 /// * `hex_bin_path` - The path where the final HEX binary file should be put.
@@ -153,6 +163,7 @@ fn build_project(
     package: &Package,
     board: &Board,
     env: &Env,
+    user_dependencies: Option<&BTreeMap<String, toml::Value>>,
     board_arch: &String,
     elf_bin_path: &PathBuf,
     hex_bin_path: &PathBuf,
@@ -186,7 +197,8 @@ fn build_project(
         proj_path, 
         &package.name, 
         &board.cargo_feature, 
-        &package.hybrid_mode
+        &package.hybrid_mode,
+        user_dependencies,
     )?;
 
     if !*json_output { display::info("Building project..."); }
