@@ -30,8 +30,8 @@ cargo install --path .
 
 You can also use pRustIO as a [Visual Studio Code extension](https://github.com/MikiiN/prustio-vscode-extension) by searching for it in the VS Code extensions marketplace.
 
-[!NOTE]
-**Note on Automatic Setup**: You do not need to manually install `PlatformIO`, `AVRDUDE`, or the `avr-gcc` compiler. The first time you run a `pRustIO` command, the tool will automatically create a private Python virtual environment in your home directory (`~/.prustio/`) and download everything it needs.
+> [!NOTE]
+> **Note on Automatic Setup**: You do not need to manually install `PlatformIO`, `AVRDUDE`, or the `avr-gcc` compiler. The first time you run a `pRustIO` command, the tool will automatically create a private Python virtual environment in your home directory (`~/.prustio/`) and download everything it needs.
 
 ## Project Management & Commands
 
