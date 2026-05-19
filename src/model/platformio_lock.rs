@@ -47,15 +47,6 @@ impl Lockfile {
         Lockfile { version, dependencies }
     }
 
-    /// Updates the existing dependencies and increments the lockfile version.
-    /// 
-    /// # Arguments
-    /// * `dependencies` - The list of the current PlatformIO project dependencies. 
-    pub fn update(&mut self, dependencies: Vec<Dependency>) {
-        self.version += 1;
-        self.dependencies = dependencies;
-    }
-
     /// Loads and parses a `platformio.lock` file from the project directory.
     ///
     /// # Arguments
