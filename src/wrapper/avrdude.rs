@@ -10,6 +10,9 @@ use std::{path::PathBuf, process::Command};
 use crate::wrapper::platformio;
 
 const PIO_AVRDUDE_PACKAGE: &str = "tool-avrdude";
+#[cfg(target_os = "windows")]
+const BINARY_NAME: &str = "avrdude.exe";
+#[cfg(not(target_os = "windows"))]
 const BINARY_NAME: &str = "avrdude";
 
 /// Uploads a compiled HEX binary to the target microcontroller.
