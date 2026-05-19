@@ -33,24 +33,26 @@ mod ctr_run;
 /// the result.
 ///
 pub fn execute() -> i32 {
+    let cli = ui::Cli::parse();
+    let json_flag = is_json_output(&cli);
+    
     if !platformio::check_pio_installation() {
         if let Err(_) = platformio::setup_platformio() {
-            display::error("Can not install application's instance of PlatformIO");
+            display::error("Can not install application's instance of PlatformIO", &json_flag);
             return 1;
         }
     }
 
-    let cli = ui::Cli::parse();
     match run_command(&cli) {
         Ok(output) => {
             if let Some(msg) = output {
-                display::success(msg.as_str());
+                display::success(msg.as_str(), &json_flag);
             } else {
-                display::success("Successfully executed command.");
+                display::success("Successfully executed command.", &json_flag);
             }
         },
         Err(msg) => {
-            display::error(msg.as_str());
+            display::error(msg.as_str(), &json_flag);
             return 1;
         }
     }
@@ -121,4 +123,25 @@ fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
         },
     }
     Ok(None)
+}
+
+/// Helper function to determine if the user requested JSON output.
+/// 
+/// # Arguments
+/// * `cli` - A reference to the parsed CLI arguments.
+fn is_json_output(cli: &ui::Cli) -> bool {
+    match &cli.command {
+        ui::TopLevelCommands::Boards { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Device { command } => match command {
+            DeviceCommands::List { json_output } => *json_output,
+            DeviceCommands::Monitor { .. } => false,
+        },
+        ui::TopLevelCommands::Project { command } => match command {
+            ProjectCommands::Init { json_output, .. } => *json_output,
+        },
+        ui::TopLevelCommands::Run { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Activate { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Refresh { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Clean { json_output, .. } => *json_output,
+    }
 }
