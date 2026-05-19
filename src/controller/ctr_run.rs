@@ -56,7 +56,13 @@ pub fn run(
 
     // fetch configuration
     let package = prustio_config::get_package_information(&proj_path)?;
-    let env = prustio_config::get_env(&proj_path, environment)?;
+    let env_name = if let Some(_) = environment {
+        environment
+    } else {
+        package.active_env.as_ref()
+    };
+    
+    let env = prustio_config::get_env(&proj_path, env_name)?;
 
     // get list of targets to run
     let targets = match target {
