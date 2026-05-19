@@ -102,7 +102,11 @@ pub fn setup_platformio() -> Result<(), String> {
 
     // create a new virtual environment in home directory
     let (venv_dir, _ ) = get_pio_dirs()?; 
-    let venv_output = Command::new("python3")
+    #[cfg(target_os = "windows")]
+    let python_cmd = "python";
+    #[cfg(not(target_os = "windows"))]
+    let python_cmd = "python3";
+    let venv_output = Command::new(python_cmd)
         .args(["-m", "venv"])
         .arg(&venv_dir)
         .output();
