@@ -210,7 +210,8 @@ fn build_project(
     )?;
 
     if !*json_output { display::info("Building project..."); }
-    cargo::cargo_build(proj_path, &None)?;
+    let show_output = !*json_output;
+    cargo::cargo_build(proj_path, &None, &show_output)?;
 
     if !*json_output { display::info("Converting ELF to HEX format..."); }
     avr::elf_to_hex(elf_bin_path, hex_bin_path)?;

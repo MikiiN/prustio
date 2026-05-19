@@ -48,7 +48,8 @@ pub fn clean(json_output: &bool) -> Result<(), String> {
 
     if !*json_output { info("Cleaning Cargo temporary files..."); }
     if target_dir.exists() {
-        wrapper::cargo::cargo_clean(&proj_path)?;
+        let show_output = !*json_output;
+        wrapper::cargo::cargo_clean(&proj_path, &show_output)?;
     }
 
     Ok(())
