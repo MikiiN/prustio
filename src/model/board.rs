@@ -246,9 +246,7 @@ fn get_pio_boards(filter: &str) -> Result<Vec<PioBoard>, String> {
 /// Internal struct representing a PlatformIO board manifest JSON file.
 #[derive(Deserialize, Debug)]
 struct PioBoardManifest {
-    _name: String,
     upload: PioUploadConfig,
-    _build: Option<PioBuildConfig>,
 }
 
 /// Internal struct representing the upload specifications for a board.
@@ -256,12 +254,6 @@ struct PioBoardManifest {
 struct PioUploadConfig {
     speed: u32, 
     protocol: String,
-}
-
-/// Internal struct representing the build specifications for a board.
-#[derive(Deserialize, Debug)]
-struct PioBuildConfig {
-    _mcu: Option<String>,
 }
 
 /// Reads the PlatformIO JSON manifest for a specific board to extract its upload configuration.

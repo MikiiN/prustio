@@ -47,9 +47,7 @@ pub fn execute() -> i32 {
         Ok(output) => {
             if let Some(msg) = output {
                 display::success(msg.as_str(), &json_flag);
-            } else {
-                display::success("Successfully executed command.", &json_flag);
-            }
+            } 
         },
         Err(msg) => {
             display::error(msg.as_str(), &json_flag);
@@ -77,12 +75,16 @@ pub fn execute() -> i32 {
 fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
-            ctr_board::board(filter.as_ref(), json_output)?;
+            let output = ctr_board::board(filter.as_ref(), json_output)?;
+            display::unformatted_print(&output);
+            return Ok(None);
         },
 
         ui::TopLevelCommands::Device { command } => match command {
             DeviceCommands::List { json_output } => {
-                ctr_device::device_list(json_output)?;
+                let output = ctr_device::device_list(json_output)?;
+                display::unformatted_print(&output);
+                return Ok(None);
             },
             DeviceCommands::Monitor { 
                 port, baud, parity, rtscts, xonxoff, rts, 
@@ -122,7 +124,7 @@ fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
             return Ok(Some("Clean command run successfully.".to_string()));
         },
     }
-    Ok(None)
+    Ok(Some("Successfully executed command.".to_string()))
 }
 
 /// Helper function to determine if the user requested JSON output.

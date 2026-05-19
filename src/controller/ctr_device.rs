@@ -7,7 +7,6 @@
 use std::env;
 
 use crate::model::device;
-use crate::ui::display;
 use crate::ui::device::{Parity, EOL};
 use crate::wrapper::platformio;
 
@@ -21,15 +20,14 @@ use crate::wrapper::platformio;
 /// 
 /// # Errors
 /// Returns an error when fails to fetch device list
-pub fn device_list(json_output: &bool) -> Result<(), String> {
+pub fn device_list(json_output: &bool) -> Result<String, String> {
     let devices = device::get_port_list()?;
     
     if *json_output {
-        display::print_devices_json(&devices);
+        Ok(format_devices_json(&devices)?)
     } else {
-        display::print_devices_table(&devices);
+        Ok(format_devices_table(&devices))
     }
-    Ok(())
 }
 
 /// Launches a serial monitor for the connected device.
@@ -90,4 +88,48 @@ pub fn device_monitor(
         echo, encoding, filter, eol, raw, exit_char, menu_char, quiet, no_reconnect
     )?;
     Ok(())
+}
+
+/// Formats the vector of devices to JSON format.
+///
+/// # Arguments
+/// * `devices` - A vector of `PioDevice` structs.
+/// 
+/// # Errors
+/// Returns an error, if formatting fails.
+fn format_devices_json(devices: &Vec<device::PioDevice>) -> Result<String, String> {
+    let json_string = match serde_json::to_string_pretty(devices) {
+        Ok(json) => json,
+        Err(_) => {
+            return Err("Failed to parse devices to the json format.".to_string())
+        }
+    };
+    Ok(json_string)
+}
+
+/// Formats the vector of devices to table format.
+///
+/// # Arguments
+/// * `devices` - A vector of `PioDevice` structs.
+/// 
+/// # Errors
+/// Returns an error, if formatting fails.
+fn format_devices_table(devices: &Vec<device::PioDevice>) -> String {
+    let mut table_string = String::new();
+
+    for device in devices {
+        let hwid = match &device.hwid {
+            Some(id) => id.clone(),
+            None => "n/a".to_string()
+        };
+        let description = match &device.description {
+            Some(desc) => desc.clone(),
+            None => "n/a".to_string()
+        };
+        table_string += format!("{}\n", device.port).as_str();
+        table_string += "----------------\n";
+        table_string += format!("Hardware ID: {}\n", hwid).as_str();
+        table_string += format!("Description: {}\n\n", description).as_str();
+    }
+    table_string
 }
