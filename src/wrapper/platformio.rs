@@ -688,3 +688,106 @@ fn check_command_output(
         } 
     };
 }
+
+//
+// Unit Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_copy_lib_to_dir_success() {
+        let temp = tempdir().unwrap();
+        let src_dir = temp.path().join("src");
+        let dest_dir = temp.path().join("dest");
+        
+        fs::create_dir(&src_dir).unwrap();
+        fs::create_dir(&dest_dir).unwrap();
+        
+        let lib_name = "libCore.a";
+        let lib_path = src_dir.join(lib_name);
+        // create dummy library
+        File::create(&lib_path).unwrap(); 
+        
+        let result = copy_lib_to_dir(lib_name, &src_dir, &dest_dir);
+        assert!(result.is_ok());
+        
+        let copied_lib = dest_dir.join(lib_name);
+        assert!(copied_lib.exists());
+    }
+
+    #[test]
+    fn test_copy_lib_to_dir_missing_src() {
+        let temp = tempdir().unwrap();
+        let src_dir = temp.path().join("src");
+        let dest_dir = temp.path().join("dest");
+        
+        fs::create_dir(&src_dir).unwrap();
+        fs::create_dir(&dest_dir).unwrap();
+        
+        // don't create the library file in src_dir
+        let result = copy_lib_to_dir("libMissing.a", &src_dir, &dest_dir);
+        
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Tried to copy non-existing library.");
+    }
+
+    #[test]
+    fn test_copy_lib_to_dir_missing_dest() {
+        let temp = tempdir().unwrap();
+        let src_dir = temp.path().join("src");
+        let dest_dir = temp.path().join("dest");
+        
+        fs::create_dir(&src_dir).unwrap();
+        // don't create dest_dir
+        
+        let lib_name = "libCore.a";
+        let lib_path = src_dir.join(lib_name);
+        File::create(&lib_path).unwrap();
+        
+        let result = copy_lib_to_dir(lib_name, &src_dir, &dest_dir);
+        
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Non-existing destination dir for library.");
+    }
+
+    #[test]
+    fn test_search_libs_in_pio_build() {
+        let temp = tempdir().unwrap();
+        let build_dir = temp.path().join("build");
+        fs::create_dir(&build_dir).unwrap();
+        
+        // create a valid library structure: build/libTest/libTest.a
+        let lib_test_dir = build_dir.join("libTest");
+        fs::create_dir(&lib_test_dir).unwrap();
+        File::create(lib_test_dir.join("libTest.a")).unwrap();
+        
+        // create a invalid file to ensure it gets ignored (e.g. object files)
+        File::create(lib_test_dir.join("libTest.o")).unwrap();
+        
+        // create a directory that doesn't start with "lib" but contains a .a file
+        let other_dir = build_dir.join("otherThing");
+        fs::create_dir(&other_dir).unwrap();
+        File::create(other_dir.join("libHidden.a")).unwrap();
+        
+        let result = search_libs_in_pio_build(&build_dir).unwrap();
+        
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, "libTest.a");
+        assert_eq!(result[0].1, lib_test_dir);
+    }
+
+    #[test]
+    fn test_get_dir_entries_failure() {
+        let temp = tempdir().unwrap();
+        let missing_dir = temp.path().join("non_existent_folder");
+        
+        let result = get_dir_entries(&missing_dir);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "PlatformIO build dir does not contain any libraries.");
+    }
+}

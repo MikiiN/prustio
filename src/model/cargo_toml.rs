@@ -227,6 +227,7 @@ pub fn create_cargo_toml_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_cargo_toml_generation_pure_mode() {
@@ -236,7 +237,7 @@ mod tests {
         // ensure prustio_arduino is not included in pure mode
         assert!(cargo.dependencies.get("prustio-arduino").is_none());
         
-        // Check hardware abstraction layer features via the Map
+        // check hardware abstraction layer features
         let hal = cargo.dependencies.get("arduino-hal").unwrap().as_table().unwrap();
         let features = hal.get("features").unwrap().as_array().unwrap();
         assert_eq!(features[0].as_str().unwrap(), "arduino-uno");
@@ -252,5 +253,93 @@ mod tests {
         let hal = cargo.dependencies.get("arduino-hal").unwrap().as_table().unwrap();
         let features = hal.get("features").unwrap().as_array().unwrap();
         assert_eq!(features[0].as_str().unwrap(), "arduino-mega2560");
+    }
+
+    #[test]
+    fn test_cargo_toml_with_user_dependencies() {
+        let mut user_deps = BTreeMap::new();
+        user_deps.insert("serde".to_string(), toml::Value::String("1.0".to_string()));
+        
+        let mut req_map = toml::map::Map::new();
+        req_map.insert("version".to_string(), toml::Value::String("0.2".to_string()));
+        user_deps.insert("reqwest".to_string(), toml::Value::Table(req_map));
+
+        let cargo = CargoToml::new(&"deps_app".to_string(), &"arduino-uno".to_string(), &false, Some(&user_deps));
+        
+        // verify custom dependencies were merged
+        assert_eq!(cargo.dependencies.get("serde").unwrap().as_str().unwrap(), "1.0");
+        assert!(cargo.dependencies.get("reqwest").unwrap().is_table());
+        
+        // verify standard dependencies are still there
+        assert!(cargo.dependencies.get("panic-halt").is_some());
+    }
+
+    #[test]
+    fn test_bin_config_defaults() {
+        let bin = BinConfig::new();
+        assert_eq!(bin.name, DEFAULT_BIN_NAME);
+        assert_eq!(bin.path, DEFAULT_MAIN_PATH);
+        assert!(!bin.test);
+        assert!(!bin.bench);
+    }
+
+    #[test]
+    fn test_profile_config_defaults() {
+        let profile = ProfileConfig::new();
+        
+        // dev profile defaults
+        assert_eq!(profile.dev.panic, "abort");
+        assert!(profile.dev.lto);
+        assert_eq!(profile.dev.opt_level, "s");
+
+        // release profile defaults
+        assert_eq!(profile.release.panic, "abort");
+        assert_eq!(profile.release.codegen_units, 1);
+        assert!(profile.release.debug);
+        assert!(profile.release.lto);
+        assert_eq!(profile.release.opt_level, "s");
+    }
+
+    #[test]
+    fn test_create_cargo_toml_config_success() {
+        let temp_dir = tempdir().unwrap();
+        let proj_path = temp_dir.path().to_path_buf();
+        
+        let result = create_cargo_toml_config(
+            &proj_path, 
+            &"my_test_app".to_string(), 
+            &"arduino-nano".to_string(), 
+            &false, 
+            None
+        );
+
+        assert!(result.is_ok());
+
+        let file_path = proj_path.join(CARGO_TOML_FILE_NAME);
+        assert!(file_path.exists());
+
+        // read the file and check
+        let content = fs::read_to_string(file_path).expect("Failed to read generated Cargo.toml");
+        assert!(content.contains("name = \"my_test_app\""));
+        assert!(content.contains("arduino-nano"));
+        assert!(content.contains("panic-halt"));
+        assert!(content.contains("codegen-units = 1"));
+    }
+
+    #[test]
+    fn test_create_cargo_toml_config_failure() {
+        // provide a invalid directory to force a file write error
+        let proj_path = PathBuf::from("/invalid/path/that/does/not/exist");
+        
+        let result = create_cargo_toml_config(
+            &proj_path, 
+            &"my_test_app".to_string(), 
+            &"arduino-nano".to_string(), 
+            &false, 
+            None
+        );
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Failed to write updated Cargo.toml file.");
     }
 }

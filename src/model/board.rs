@@ -385,3 +385,88 @@ pub fn get_unspecified_board() -> Board {
         UNSPECIFIED_PARAM,
     )
 }
+
+//
+// Tests
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_board_new_custom() {
+        let board = Board::new_custom(
+            "custom_uno",
+            "atmega328p",
+            "atmelavr",
+            "arduino-uno",
+            115200,
+            "arduino",
+            "nightly-2025-04-27",
+            16000000,
+            2048,
+            32768,
+            "Custom Uno Board",
+        );
+
+        assert_eq!(board.id, "custom_uno");
+        assert_eq!(board.mcu, "atmega328p");
+        assert_eq!(board.platform, Platform::ATMELAVR);
+        assert_eq!(board.cargo_feature, "arduino-uno");
+        assert_eq!(board.bus_speed, 115200);
+        assert_eq!(board.upload_protocol, "arduino");
+        assert_eq!(board.rustc_version, "nightly-2025-04-27");
+        assert_eq!(board.fcpu, 16000000);
+        assert_eq!(board.ram, 2048);
+        assert_eq!(board.rom, 32768);
+        assert_eq!(board.name, "Custom Uno Board");
+    }
+
+    #[test]
+    fn test_get_unspecified_board() {
+        let board = get_unspecified_board();
+        
+        assert_eq!(board.id, UNSPECIFIED_PARAM);
+        assert_eq!(board.mcu, UNSPECIFIED_PARAM);
+        assert_eq!(board.platform, Platform::UNKNOWN);
+        assert_eq!(board.cargo_feature, UNSPECIFIED_PARAM);
+        assert_eq!(board.bus_speed, 0);
+        assert_eq!(board.upload_protocol, UNSPECIFIED_PARAM);
+        assert_eq!(board.rustc_version, UNSPECIFIED_RUSTC_VERSION);
+        assert_eq!(board.fcpu, 0);
+        assert_eq!(board.ram, 0);
+        assert_eq!(board.rom, 0);
+        assert_eq!(board.name, UNSPECIFIED_PARAM);
+    }
+
+    #[test]
+    fn test_get_filtered_board_ids() {
+        let filter_nano = String::from("nano");
+        let filtered_nano = get_filtered_board_ids(&filter_nano);
+        
+        assert!(filtered_nano.contains(&"nanoatmega328"));
+        assert!(filtered_nano.contains(&"nanoatmega328new"));
+        assert!(filtered_nano.contains(&"nanoatmega168"));
+        assert!(!filtered_nano.contains(&"uno"));
+
+        // test case-insensitivity
+        let filter_upper = String::from("UNO");
+        let filtered_upper = get_filtered_board_ids(&filter_upper);
+        
+        assert!(filtered_upper.contains(&"uno"));
+        assert_eq!(filtered_upper.len(), 1);
+
+        // test empty string matches everything
+        let filter_empty = String::from("");
+        let filtered_empty = get_filtered_board_ids(&filter_empty);
+        
+        assert_eq!(filtered_empty.len(), SUPPORTED_BOARD_IDS.len());
+
+        // test no matches
+        let filter_none = String::from("raspberrypi");
+        let filtered_none = get_filtered_board_ids(&filter_none);
+        
+        assert!(filtered_none.is_empty());
+    }
+}

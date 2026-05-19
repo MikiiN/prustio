@@ -195,6 +195,7 @@ pub fn parse_pio_list_output(stdout: &str) -> Result<Vec<Dependency>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_parse_pio_list_output() {
@@ -208,18 +209,114 @@ Libraries
         
         assert_eq!(deps.len(), 3);
         
-        // Assert Platform extraction
+        // assert platform extraction
         assert_eq!(deps[0].name, "atmelavr");
         assert_eq!(deps[0].version, "5.0.0");
         assert_eq!(deps[0].category, Category::Platform);
         
-        // Assert Library extraction
+        // assert library extraction
         assert_eq!(deps[1].name, "SomeLib");
         assert_eq!(deps[1].version, "1.2.3");
         assert_eq!(deps[1].category, Category::Library);
         
-        // Assert Tool extraction (prefix based)
+        // assert tool extraction
         assert_eq!(deps[2].name, "tool-avrdude");
         assert_eq!(deps[2].category, Category::Tool);
+    }
+
+    #[test]
+    fn test_parse_pio_list_output_framework() {
+        let sample_output = "
+├── framework-arduino-avr @ 1.8.3
+";
+        let deps = parse_pio_list_output(sample_output).unwrap();
+        
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].name, "framework-arduino-avr");
+        assert_eq!(deps[0].version, "1.8.3");
+        assert_eq!(deps[0].category, Category::Framework);
+    }
+
+    #[test]
+    fn test_lockfile_new() {
+        let deps = vec![
+            Dependency {
+                name: "my_lib".to_string(),
+                version: "1.0".to_string(),
+                category: Category::Library,
+            }
+        ];
+        let lockfile = Lockfile::new(deps, 1);
+        
+        assert_eq!(lockfile.version, 1);
+        assert_eq!(lockfile.dependencies.len(), 1);
+        assert_eq!(lockfile.dependencies[0].name, "my_lib");
+    }
+
+    #[test]
+    fn test_get_platform_packages() {
+        let deps = vec![
+            Dependency { name: "framework-arduino".to_string(), version: "2.0".to_string(), category: Category::Framework },
+            Dependency { name: "toolchain-atmel".to_string(), version: "3.0".to_string(), category: Category::Tool },
+        ];
+        let lockfile = Lockfile::new(deps, 1);
+        
+        let frameworks = lockfile.get_platform_packages();
+        assert_eq!(frameworks.len(), 1);
+        assert_eq!(frameworks[0], "\n    framework-arduino @ 2.0");
+    }
+
+    #[test]
+    fn test_get_lib_deps() {
+        let deps = vec![
+            Dependency { name: "SomeLib".to_string(), version: "1.2".to_string(), category: Category::Library },
+            Dependency { name: "atmelavr".to_string(), version: "4.0".to_string(), category: Category::Platform },
+        ];
+        let lockfile = Lockfile::new(deps, 1);
+        
+        let libs = lockfile.get_lib_deps();
+        assert_eq!(libs.len(), 1);
+        assert_eq!(libs[0], "/n    SomeLib @ 1.2");
+    }
+
+    #[test]
+    fn test_save_and_load_lockfile() {
+        let temp_dir = tempdir().unwrap();
+        let proj_path = temp_dir.path().to_path_buf();
+        
+        let deps = vec![
+            Dependency { name: "TestFramework".to_string(), version: "1.0.0".to_string(), category: Category::Framework },
+            Dependency { name: "TestLib".to_string(), version: "2.5.1".to_string(), category: Category::Library },
+        ];
+        let original_lockfile = Lockfile::new(deps, 1);
+        
+        let save_result = original_lockfile.save(&proj_path);
+        assert!(save_result.is_ok());
+        
+        assert!(proj_path.join(FILE_NAME).exists()); 
+
+        let loaded_lockfile = Lockfile::load(&proj_path).expect("Failed to load lockfile");
+        
+        assert_eq!(loaded_lockfile.version, 1);
+        assert_eq!(loaded_lockfile.dependencies.len(), 2);
+        assert_eq!(loaded_lockfile.dependencies[0].name, "TestFramework");
+        assert_eq!(loaded_lockfile.dependencies[1].name, "TestLib");
+    }
+
+    #[test]
+    fn test_load_nonexistent_lockfile() {
+        let temp_dir = tempdir().unwrap();
+        let proj_path = temp_dir.path().to_path_buf();
+        
+        let result = Lockfile::load(&proj_path);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "PlatformIO lock file does not exists.");
+    }
+
+    #[test]
+    fn test_get_pio_lock_path() {
+        let proj_dir = PathBuf::from("/mock/project");
+        let lock_path = get_pio_lock_path(&proj_dir);
+        assert_eq!(lock_path, PathBuf::from("/mock/project/platformio.lock"));
     }
 }
