@@ -206,14 +206,14 @@ mod tests {
         let temp = tempdir().unwrap();
         let new_dir = temp.path().join("new_folder");
         
-        // Directory shouldn't exist initially
+        // directory shouldn't exist initially
         assert!(!new_dir.exists());
         
-        // Function should create it
+        // function should create it
         assert!(ensure_dir_exists(&new_dir).is_ok());
         assert!(new_dir.exists());
         
-        // Calling it again on an existing directory should not error
+        // calling it again on an existing directory should not be an error
         assert!(ensure_dir_exists(&new_dir).is_ok());
     }
 
@@ -223,12 +223,112 @@ mod tests {
         let dir_to_clear = temp.path().join("to_clear");
         std::fs::create_dir(&dir_to_clear).unwrap();
         
-        // Add a dummy file inside the directory
+        // add a dummy file inside the directory
         std::fs::write(dir_to_clear.join("dummy.txt"), "data").unwrap();
 
         assert!(clear_dir(&dir_to_clear).is_ok());
         
-        // The directory and its contents should be gone
+        // directory and its contents should be gone
         assert!(!dir_to_clear.exists());
+    }
+
+    #[test]
+    fn test_get_venv_executable() {
+        let venv_dir = PathBuf::from("/mock/venv");
+        let exec = get_venv_executable(&venv_dir, "python");
+        
+        #[cfg(target_os = "windows")]
+        assert_eq!(exec, PathBuf::from("/mock/venv/Scripts/python.exe"));
+        
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(exec, PathBuf::from("/mock/venv/bin/python"));
+    }
+
+    #[test]
+    fn test_check_venv_executable_existence() {
+        let temp = tempdir().unwrap();
+        let venv_dir = temp.path().to_path_buf();
+        
+        // construct expected structure based on the OS
+        #[cfg(target_os = "windows")]
+        let bin_dir = venv_dir.join("Scripts");
+        #[cfg(not(target_os = "windows"))]
+        let bin_dir = venv_dir.join("bin");
+        
+        std::fs::create_dir(&bin_dir).unwrap();
+        
+        #[cfg(target_os = "windows")]
+        let exe_name = "dummy_tool.exe";
+        #[cfg(not(target_os = "windows"))]
+        let exe_name = "dummy_tool";
+        
+        // create dummy executable
+        let exe_path = bin_dir.join(exe_name);
+        std::fs::write(&exe_path, "").unwrap();
+        
+        assert!(check_venv_executable_existence(&venv_dir, "dummy_tool"));
+        assert!(!check_venv_executable_existence(&venv_dir, "missing_tool"));
+    }
+
+    #[test]
+    fn test_get_project_app_dir() {
+        let temp = tempdir().unwrap();
+        let proj_path = temp.path().to_path_buf();
+        
+        let app_dir = get_project_app_dir(&proj_path).unwrap();
+        
+        assert_eq!(app_dir, proj_path.join(PROJECT_APP_DIR_NAME));
+        // verifies that ensure_dir_exists was called
+        assert!(app_dir.exists()); 
+    }
+
+    #[test]
+    fn test_check_if_is_project_dir() {
+        let temp = tempdir().unwrap();
+        let proj_path = temp.path().to_path_buf();
+        
+        // without Prustio.toml
+        assert!(!check_if_is_project_dir(&proj_path));
+        
+        // with Prustio.toml
+        std::fs::write(proj_path.join("Prustio.toml"), "").unwrap();
+        assert!(check_if_is_project_dir(&proj_path));
+    }
+
+    #[test]
+    fn test_check_if_is_pio_dir() {
+        let temp = tempdir().unwrap();
+        let proj_path = temp.path().to_path_buf();
+        
+        // without platformio.ini
+        assert!(!check_if_is_pio_dir(&proj_path));
+        
+        // with platformio.ini
+        std::fs::write(proj_path.join("platformio.ini"), "").unwrap();
+        assert!(check_if_is_pio_dir(&proj_path));
+    }
+
+    #[test]
+    fn test_get_compiled_libs_names() {
+        let temp = tempdir().unwrap();
+        let proj_path = temp.path().to_path_buf();
+        
+        let libs_dir = proj_path.join(PROJECT_APP_DIR_NAME).join(COMPILED_LIBS_DIR_NAME);
+        std::fs::create_dir_all(&libs_dir).unwrap();
+        
+        // create dummy files
+        std::fs::write(libs_dir.join("libArduinoCore.a"), "").unwrap();
+        std::fs::write(libs_dir.join("libWire.a"), "").unwrap();
+        std::fs::write(libs_dir.join("libWrapper.a"), "").unwrap(); 
+        std::fs::write(libs_dir.join("random_file.txt"), "").unwrap(); 
+        std::fs::write(libs_dir.join("CustomLib.a"), "").unwrap(); 
+        
+        let mut names = get_compiled_libs_names(&proj_path);
+        names.sort();
+        
+        assert_eq!(names.len(), 3);
+        assert_eq!(names[0], "ArduinoCore");
+        assert_eq!(names[1], "CustomLib");
+        assert_eq!(names[2], "Wire");
     }
 }

@@ -137,12 +137,12 @@ mod tests {
         let devices: Vec<PioDevice> = serde_json::from_str(json_data).unwrap();
         assert_eq!(devices.len(), 2);
         
-        // The first device should retain its valid String data
+        // first device should retain its valid string data
         assert_eq!(devices[0].port, "/dev/ttyUSB0");
         assert_eq!(devices[0].description, Some("USB Serial".to_string()));
         assert_eq!(devices[0].hwid, Some("USB VID:PID=1A86:7523".to_string()));
 
-        // The second device should have "n/a" correctly parsed into None
+        // second device should have "n/a" parsed into None
         assert_eq!(devices[1].port, "/dev/ttyS0");
         assert_eq!(devices[1].description, None);
         assert_eq!(devices[1].hwid, None);

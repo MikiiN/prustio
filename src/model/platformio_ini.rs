@@ -139,9 +139,9 @@ mod tests {
         assert_eq!(config.platform, "atmelavr");
         assert_eq!(config.board, "uno");
         assert_eq!(config.build_flags, "-c");
-        // Ensure vector joined successfully
+        // ensure vector joined successfully
         assert_eq!(config.platform_packages, Some("pkg1pkg2".to_string()));
-        // Ensure missing arrays remain None
+        // ensure missing arrays remain None
         assert_eq!(config.lib_deps, None);
     }
 }
