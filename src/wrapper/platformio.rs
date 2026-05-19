@@ -15,9 +15,7 @@ use crate::cpp_templates::{arduino_wrapper_cpp, arduino_wrapper_h};
 use crate::model::platformio_ini;
 use crate::ui::device::{EOL, Parity};
 use crate::utils::{
-    COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, 
-    check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, 
-    get_project_app_dir, get_venv_executable
+    self, COMPILED_LIBS_DIR_NAME, PIO_COMPILATION_PROJECT_DIR_NAME, check_if_is_pio_dir, check_venv_executable_existence, clear_dir, ensure_dir_exists, get_app_dir, get_project_app_dir, get_venv_executable
 };
 
 const PIO_VENV_DIR_NAME: &str = "pio_venv";
@@ -41,9 +39,35 @@ pub fn check_pio_installation() -> bool {
 ///
 /// # Arguments
 /// * `filter` - A string to filter the board results by ID or name.
-pub fn get_boards(filter: &str) -> std::io::Result<Output> {
+/// 
+/// # Errors
+/// Returns an error, if command execution or parsing to string fails.
+pub fn get_boards(filter: &str) -> Result<String, String> {
     let mut cmd = Command::new("pio");
-    return cmd.args(["boards", filter, "--json-output"]).output();
+    let result = cmd.args(["boards", filter, "--json-output"]).output();
+
+    match result {
+        Ok(output) => {
+            // check if command failed
+            if !output.status.success() {
+                let stderr_str = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Tool PlatformIO failed with error:\n{}", stderr_str));
+            }
+
+            // parsing raw output to String
+            match str::from_utf8(&output.stdout) {
+                Ok(out_str) => {
+                    return Ok(out_str.to_string());
+                },
+                Err(_) => {
+                    return Err("Failed to parse board output form PlatformIO.".to_string());
+                }
+            };
+        },
+        Err(_) => {
+            return Err("PlatformIO failed to find the specified board".to_string());
+        }
+    };
 }
 
 /// Retrieves the paths to the PlatformIO virtual environment and core directories.
@@ -72,28 +96,47 @@ pub fn get_pio_dirs() -> Result<(PathBuf, PathBuf), String> {
 /// # Errors
 /// Returns an error if `python3` or `pip` are not available, or if the installation fails.
 pub fn setup_platformio() -> Result<(), String> {
-    // TODO check for python existence
+    if !utils::is_python_installed() {
+        return Err("Missing required dependency: Python".to_string());
+    }
+
+    // create a new virtual environment in home directory
     let (venv_dir, _ ) = get_pio_dirs()?; 
-    let venv_status = Command::new("python3")
+    let venv_output = Command::new("python3")
         .args(["-m", "venv"])
         .arg(&venv_dir)
-        .status()
-        .expect("Failed to execute python3. Is Python installed?");
+        .output();
 
-    if !venv_status.success() {
-        return Err("Failed to create python virtual environment.".to_string());
+    match venv_output {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr_str = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to create python virtual environment with error:\n{}", stderr_str));
+            }
+        },
+        Err(_) => {
+            return Err("Failed execute the command for creating a new virtual environment.".to_string());
+        }
     }
 
+    // install PlatformIO to the virtual environment
     let pip_path = get_venv_executable(&venv_dir, "pip");
-
-    let pip_status = Command::new(pip_path)
+    let pip_output = Command::new(pip_path)
         .args(["install", "-U", "platformio"])
-        .status()
-        .expect("Failed to execute pip install.");
+        .output();
 
-    if !pip_status.success() {
-        return Err("Failed to install the platformIO.".to_string());
+    match pip_output {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr_str = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to install PlatformIO in virtual environment with error:\n{}", stderr_str));
+            }
+        },
+        Err(_) => {
+            return Err("Failed execute the command for installing platformIO.".to_string());
+        }
     }
+
     Ok(())
 }
 
@@ -113,13 +156,13 @@ pub fn download_pio_toolchain(toolchain_name: &str) -> Result<(), String> {
         "--tool", 
         toolchain_name,
     ];
-    // TODO check output.status
-    match run_pio_command(&venv_dir, &core_dir, &args, None) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err("PlatformIO failed to install toolchain.".to_string());
-        } 
-    };
+
+    let output = run_pio_command(&venv_dir, &core_dir, &args, None);
+    check_command_output(
+        output, 
+        "PlatformIO failed to install the toolchain with error:", 
+        "PlatformIO failed to install the toolchain.",
+    )?;
     
     Ok(())
 }
@@ -140,13 +183,13 @@ pub fn download_pio_platform(platform_name: &str) -> Result<(), String> {
         "--platform", 
         platform_name,
     ];
-    // TODO check output.status
-    match run_pio_command(&venv_dir, &core_dir, &args, None) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err("PlatformIO failed to install toolchain.".to_string());
-        } 
-    };
+
+    let output = run_pio_command(&venv_dir, &core_dir, &args, None);
+    check_command_output(
+        output, 
+        "PlatformIO failed to install the platform with error:", 
+        "PlatformIO failed to install the platform.",
+    )?;
     
     Ok(())
 }
@@ -160,18 +203,13 @@ pub fn get_devices() -> Result<Vec<u8>, String> {
     let args = [
         "device", "list", "--json-output"
     ];
-    let output = match run_pio_command(&venv_dir, &core_dir, &args, None) {
-        Ok(o) => o,
-        Err(_) => {
-            return Err(String::from("PlatformIO failed to get device list."));
-        } 
-    };
 
-    if !output.status.success() {
-        return Err(String::from("PlatformIO failed to execute command"));
-    }
-
-    Ok(output.stdout)
+    let output = run_pio_command(&venv_dir, &core_dir, &args, None);
+    check_command_output(
+        output, 
+        "PlatformIO failed to get device list with error:", 
+        "PlatformIO failed to get device.",
+    )
 }
 
 /// Initializes the PlatformIO workspace for compiling C/C++ dependencies.
@@ -180,6 +218,14 @@ pub fn get_devices() -> Result<Vec<u8>, String> {
 /// and automatically injects the `wrapper.cpp` and `wrapper.h` templates into 
 /// the `src/` directory. These wrappers expose the Arduino framework functions 
 /// to the Rust application via FFI.
+/// 
+/// # Arguments
+/// * `project_dir` - The project location. 
+/// * `platform` - The platform identifier.
+/// * `board_id` - The board identifier.
+/// * `framework` - Used PlatformIO framework.
+/// * `platform_packages` - The platform's packages.
+/// * `lib_deps` - The PlatformIO's project dependencies. 
 ///
 /// # Errors
 /// Returns an error if the workspace directory cannot be managed, PlatformIO fails 
@@ -195,7 +241,7 @@ pub fn init_compilation_project(
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
     
-    // Ensure data from old build will not interfere with current build
+    // ensure data from old build will not interfere with current build
     clear_dir(&pio_proj)?;
 
     ensure_dir_exists(&pio_proj)?;
@@ -206,41 +252,33 @@ pub fn init_compilation_project(
         }
     };
 
+    // init pio project
     let (venv_dir, core_dir) = get_pio_dirs()?;
     let pio_args = [
         "project", "init", "-d", pio_path_str
     ];
-    let output = match run_pio_command(&venv_dir, &core_dir, &pio_args, None) {
-        Ok(o) => o,
-        Err(_) => {
-            return Err("Failed to init PlatformIO project".to_string());
-        } 
-    };
-
-    if !output.status.success() {
-        return Err("PlatformIO failed to execute init command".to_string());
-    }
+    let cmd_output = run_pio_command(&venv_dir, &core_dir, &pio_args, None);
+    check_command_output(
+        cmd_output, 
+        "Failed to init the PlatformIO project with error:", 
+        "PlatformIO failed to execute init command.",
+    )?;
 
     platformio_ini::rewrite_pio_config(&pio_proj, platform, board_id, framework, platform_packages, lib_deps)?;
 
+    // add wrapper header file to the src directory
     let pio_src = pio_proj.join(PIO_SRC_DIR_NAME);
     ensure_dir_exists(&pio_src)?;
-
     let header_file = pio_src.join(arduino_wrapper_h::NAME);
-    match std::fs::write(header_file, arduino_wrapper_h::CONTENT) {
-        Ok(_) => (),
-        Err(_) => {
-            return Err("Failed to write wrapper.h content.".to_string()); 
-        }
-    };
-
+    if let Err(_) = std::fs::write(header_file, arduino_wrapper_h::CONTENT) {
+        return Err("Failed to write wrapper.h content.".to_string()); 
+    }
+    
+    // add wrapper source files to the src directory
     let cpp_file = pio_src.join(arduino_wrapper_cpp::NAME);
-    match std::fs::write(cpp_file, arduino_wrapper_cpp::CONTENT) {
-        Ok(_) => (),
-        Err(_) => {
-            return Err("Failed to write wrapper.cpp content.".to_string()); 
-        }
-    };
+    if let Err(_) = std::fs::write(cpp_file, arduino_wrapper_cpp::CONTENT) {
+        return Err("Failed to write wrapper.cpp content.".to_string()); 
+    }
 
     Ok(())
 }
@@ -249,6 +287,13 @@ pub fn init_compilation_project(
 ///
 /// Passes standard input/output directly to the terminal, allowing the user to 
 /// interact with their running hardware.
+/// 
+/// # Arguments
+/// * `project_dir` - The project path.
+/// * other arguments - Parameters for `pio device monitor` command.
+/// 
+/// # Errors
+/// Returns error, if `pio device monitor` command fails.  
 pub fn device_monitor(
     project_dir: &PathBuf,
     port: &Option<String>, 
@@ -386,19 +431,15 @@ pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, Str
     let pio_args = [
         "pkg", "list"
     ];
-    let output = match run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj)) {
-        Ok(o) => o,
-        Err(_) => {
-            return Err("Failed to execute PlatformIO pkg list command.".to_string());
-        } 
-    };
+    let output = run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj));
+    let stdout = check_command_output(
+        output, 
+        "The PlatformIO command failed with error:", 
+        "Failed to execute PlatformIO pkg list command."
+    )?;
 
-    if !output.status.success() {
-        return Err("PlatformIO pkg list failed.".to_string());
-    }
-
-    match String::from_utf8(output.stdout) {
-        Ok(stdout) => Ok(stdout),
+    match String::from_utf8(stdout) {
+        Ok(out) => Ok(out),
         Err(_) => Err("Failed to parse PlatformIO pkg list output as UTF-8".to_string()),
     }
 }
@@ -409,6 +450,13 @@ pub fn get_pio_project_dependencies(project_dir: &PathBuf) -> Result<String, Str
 /// compiling the Arduino framework, this function searches the the `.pio/build` directory,
 /// locates the resulting `.a` static libraries, and copies them to the central  
 /// `built_libs` directory so Cargo can easily link them later.
+/// 
+/// # Arguments
+/// * `project_dir` - The project directory.
+/// * `board_id` - The board's identifier.
+/// 
+/// # Errors
+/// Returns an error, when fails to compile the libraries. 
 pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(), String> {
     let app_dir = get_project_app_dir(project_dir)?;
     let pio_proj = app_dir.join(PIO_COMPILATION_PROJECT_DIR_NAME);
@@ -417,32 +465,32 @@ pub fn compile_c_libraries(project_dir: &PathBuf, board_id: &String) -> Result<(
         return Err("Missing PlatformIO project.".to_string());
     }
 
+    // project compilation
     let (venv_dir, core_dir) = get_pio_dirs()?;
     let pio_args = [
         "run"
     ];
-    let output = match run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj)) {
-        Ok(o) => o,
-        Err(_) => {
-            return Err("Failed to compile PlatformIO project".to_string());
-        } 
-    };
+    let output = run_pio_command(&venv_dir, &core_dir, &pio_args, Some(&pio_proj));
+    check_command_output(
+        output, 
+        "Failed to compile PlatformIO project with error:", 
+        "PlatformIO failed to execute run command"
+    )?;
 
-    if !output.status.success() {
-        return Err("PlatformIO failed to execute run command".to_string());
-    }
-
+    // ensure directory exists
     let compiled_dir = app_dir.join(COMPILED_LIBS_DIR_NAME);
     clear_dir(&compiled_dir)?;
     ensure_dir_exists(&compiled_dir)?;
-
+    
     let pio_build_dir = pio_proj.join(PIO_PROJECT_APP_DIR_NAME)
                                 .join("build")
                                 .join(board_id);
+        
     if !pio_build_dir.exists() {
         return Err("Missing pio build directory.".to_string());
     }
 
+    // copying compiled libraries to same directory
     let wrapper_dir = pio_build_dir.join("src");
     copy_lib_to_dir("wrapper.cpp.o", &wrapper_dir, &compiled_dir)?;
 
@@ -611,4 +659,32 @@ fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args:
     let status = child.wait()
         .map_err(|e| format!("Failed to wait on PlatformIO process: {}", e))?;
     Ok(status)
+}
+
+/// Checks the output of executed command and returns the STDOUT if succeeded.
+/// 
+/// # Arguments
+/// * `output` - The output of the command.
+/// * `fail_msg` - The error message if the command was executed, but failed.
+/// * `error_msg` - The error message if the command wasn't executed.
+/// 
+/// # Errors
+/// Returns error if command for some reason didn't succeeded.
+fn check_command_output(
+    output: Result<Output, Error>,
+    fail_msg: &str,
+    error_msg: &str,
+) -> Result<Vec<u8>, String> {
+    match output {
+        Ok(output) => {
+            if !output.status.success() {
+                let stderr_str = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("{}\n{}", fail_msg, stderr_str))
+            }
+            return Ok(output.stdout);
+        },
+        Err(_) => {
+            return Err(error_msg.to_string());
+        } 
+    };
 }

@@ -43,6 +43,7 @@ pub fn init_project(
     hybrid: &bool, 
     json_output: &bool,
 ) -> Result<(), String> {
+    // fetch project's path
     let proj_name = match name {
         Some(n) => n,
         None => &String::from(DEFAULT_PROJECT_NAME),
@@ -53,10 +54,9 @@ pub fn init_project(
         return Err("The project or directory with same name already exists.".to_string());  
     }
 
+    // get board's configuration and init cargo
     let board = match board_id {
-        Some(id) => {
-            board::get_board(id)?
-        },
+        Some(id) => board::get_board(id)?,
         None => board::get_unspecified_board()
     };
 
@@ -67,9 +67,8 @@ pub fn init_project(
     }
     cargo_init(&proj_path, proj_name, &board_arch, &board.mcu, &board.cargo_feature, &board.rustc_version, hybrid)?;
 
-    // TODO - hardcoded
     let framework = if *hybrid {
-            Some(&String::from("arduino"))
+            Some(&board.platform.to_framework())
         } else {
             None
         };
@@ -85,6 +84,15 @@ pub fn init_project(
 /// or adds the necessary files (`.cargo/config.toml`, `Cargo.toml`, 
 /// `rust-toolchain.toml`, and `src/main.rs`) to support AVR compilation.
 ///
+/// #Arguments
+/// * `proj_path` - The project's path. 
+/// * `proj_name` - the name of the project.
+/// * `board_arch` - The board's architecture.
+/// * `board_mcu` - The board's microcontroller identifier.
+/// * `cargo_feature` - The avr-hal feature specifying board.
+/// * `rustc_version` - The rust compiler version.
+/// * `hybrid` - The hybrid mode flag.
+/// 
 /// # Errors
 /// Returns an error if the internal native `cargo init` call fails or if 
 /// generating any of the configuration files fails.
@@ -112,6 +120,13 @@ fn cargo_init(
 
 /// Sets up the custom `Prustio.toml` configuration file.
 ///
+/// #Arguments
+/// * `proj_path` - The project's path. 
+/// * `proj_name` - the name of the project.
+/// * `hybrid` - The hybrid mode flag.
+/// * `board_id` - The board's identifier.
+/// * `framework` - The C++ framework for the hybrid mode.
+/// 
 /// # Errors
 /// Returns an error if writing the `Prustio.toml` file to disk fails.
 fn prustio_init(

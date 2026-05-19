@@ -100,12 +100,12 @@ pub fn create_toolchain_config(
         None => &"minimal".to_string(),
     };
 
+    // init configuration content
     let configuration = ToolchainConfiguration::new(
         rustc_version, 
         parsed_components, 
         parsed_profile,
     );
-
     configuration.write_configuration(&file_path)
 }
 
@@ -123,7 +123,7 @@ pub fn create_toolchain_config(
 ///
 /// # Errors
 /// Returns an error if reading or writing to the file system fails.
-pub fn update_toolchain_config(
+pub fn _update_toolchain_config(
     proj_path: &PathBuf, 
     rustc_version: &String,
     components: &Option<Vec<String>>,
@@ -141,6 +141,7 @@ pub fn update_toolchain_config(
         }
     };
 
+    // read current configuration
     let mut parsed_config: ToolchainConfiguration = match toml::de::from_str(&config) {
         Ok(conf) => conf,
         Err(_) => {
@@ -148,6 +149,7 @@ pub fn update_toolchain_config(
         }
     };
 
+    // update content
     parsed_config.toolchain.channel = rustc_version.clone();
     match components {
         Some(c) => {

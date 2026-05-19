@@ -35,6 +35,7 @@ pub struct Dependency {
 /// The root structure representing the `platformio.lock` file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Lockfile {
+    /// The version of the lock file.
     pub version: u8,
     /// The list of all locked dependencies.
     pub dependencies: Vec<Dependency>,

@@ -18,19 +18,18 @@ use crate::wrapper::platformio;
 ///
 /// # Arguments
 /// * `json_output` - If `true`, prints the output as a JSON string instead of a human-readable table.
-pub fn device_list(json_output: &bool) {
-    let devices = match device::get_port_list() {
-        Ok(list) => list,
-        Err(e) => {
-            println!("Error: {}", e);
-            return;
-        }
-    };
+/// 
+/// # Errors
+/// Returns an error when fails to fetch device list
+pub fn device_list(json_output: &bool) -> Result<(), String> {
+    let devices = device::get_port_list()?;
+    
     if *json_output {
         display::print_devices_json(&devices);
     } else {
         display::print_devices_table(&devices);
     }
+    Ok(())
 }
 
 /// Launches a serial monitor for the connected device.
@@ -82,7 +81,7 @@ pub fn device_monitor(
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
-            return Err("Error: Failed to get current working directory.".to_string());
+            return Err("Failed to get current working directory.".to_string());
         },
     };
 

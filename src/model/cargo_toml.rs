@@ -63,12 +63,10 @@ impl CargoToml {
 
         // merge user dependencies
         if let Some(user_deps) = user_dependencies {
-            println!("{:?}", user_deps);
             for (key, val) in user_deps {
                 deps.insert(key.clone(), val.clone());
             }
         }
-        println!("{:?}", deps);
 
         CargoToml { 
             package: PackageConfig::new(name), 
@@ -88,6 +86,10 @@ pub struct PackageConfig {
 }
 
 impl PackageConfig {
+    /// Constructs a new struct representing a `package` section in `Cargo.toml` file.
+    /// 
+    /// # Arguments
+    /// * `name` - The project's name. 
     pub fn new(name: &String) -> PackageConfig{
         PackageConfig {
             name: name.clone(),
@@ -107,6 +109,7 @@ pub struct BinConfig {
 }
 
 impl BinConfig {
+    /// Constructs a new `bin` section in `Cargo.toml` file.
     pub fn new() -> BinConfig {
         BinConfig {
             name: DEFAULT_BIN_NAME.to_string(),
@@ -125,6 +128,7 @@ pub struct ProfileConfig {
 }
 
 impl ProfileConfig {
+    /// Constructs a new `profile` section in `Cargo.toml` file.
     pub fn new() -> ProfileConfig {
         ProfileConfig { 
             dev: ProfileDevConfig::new(), 
@@ -143,6 +147,7 @@ pub struct ProfileDevConfig {
 }
 
 impl ProfileDevConfig {
+    /// Constructs a new `profile.dev` section in `Cargo.toml` file.
     pub fn new() -> ProfileDevConfig {
         ProfileDevConfig { 
             panic: "abort".to_string(), 
@@ -165,6 +170,7 @@ pub struct ProfileReleaseConfig {
 }
 
 impl ProfileReleaseConfig {
+    /// Constructs a new `profile.release` section in `Cargo.toml` file.
     pub fn new() -> ProfileReleaseConfig {
         ProfileReleaseConfig { 
             panic: "abort".to_string(), 
@@ -198,7 +204,6 @@ pub fn create_cargo_toml_config(
     user_dependencies: Option<&BTreeMap<String, toml::Value>>,
 ) -> Result<(), String> {
     let file_path = PathBuf::from(proj_path).join(CARGO_TOML_FILE_NAME);
-    
     let config = CargoToml::new(project_name, board_feature, hybrid, user_dependencies);
 
     let content = match toml::to_string_pretty(&config) {
@@ -208,12 +213,9 @@ pub fn create_cargo_toml_config(
         }
     };
 
-    match fs::write(&file_path, &content) {
-        Ok(_) => {},
-        Err(_) => {
-            return Err("Failed to write updated Cargo.toml file.".to_string());
-        }
-    };
+    if let Err(_) = fs::write(&file_path, &content) {
+        return Err("Failed to write updated Cargo.toml file.".to_string());
+    }
     Ok(())
 }
 

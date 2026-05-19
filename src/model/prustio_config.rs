@@ -73,7 +73,7 @@ impl Configuration {
             Err(_) => return Err("Failed to format Prustio.toml document.".to_string()),
         };
 
-        // post-processing to prevent [dependencies.name] parts
+        // post-processing to prevent [dependencies.name] parts occur
         if let Some(deps) = doc.get_mut("dependencies").and_then(|i| i.as_table_mut()) {
             let keys: Vec<String> = deps.iter().filter_map(|(k, v)| {
                 if v.is_table() { Some(k.to_string()) } else { None }

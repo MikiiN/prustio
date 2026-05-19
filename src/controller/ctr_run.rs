@@ -30,21 +30,20 @@ const DEFAULT_HEX_BIN_NAME: &str = "bin.hex";
 ///
 /// # Arguments
 /// * `target` - Optional override for the target action (e.g., "build" or "upload"). 
-///   If `None`, it defaults to the targets defined in the active environment.
-/// * `environment` - Optional override for the environment to build. If `None`, 
-///   it uses the active environment from `Prustio.toml`.
+/// * `environment` - Optional override for the environment to build.
 /// * `json_output` - If `true`, suppresses standard console logs for JSON compatibility.
 ///
 /// # Errors
 /// Returns an error string if:
 /// * Not running inside a valid pRustIO project.
 /// * Configurations fail to load or parse.
-/// * The build or upload tools (Cargo, PlatformIO, AVRDUDE) encounter an error.
+/// * The build or upload tools encounter an error.
 pub fn run(
     target: &Option<String>,
     environment: Option<&String>,
     json_output: &bool,
 ) -> Result<(), String> {
+    // fetch project's dir
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
@@ -55,9 +54,11 @@ pub fn run(
         return Err("Not in project dir.".to_string());
     }
 
+    // fetch configuration
     let package = prustio_config::get_package_information(&proj_path)?;
     let env = prustio_config::get_env(&proj_path, environment)?;
 
+    // get list of targets to run
     let targets = match target {
         Some(t) => {
             Vec::from([Target::from(t)?])
@@ -78,6 +79,7 @@ pub fn run(
         }
     };
 
+    // prepare binary parameters
     let board = board::get_board(&env.board)?;
     let board_arch = board.platform.to_cargo_arch();
 
@@ -91,6 +93,7 @@ pub fn run(
 
     let user_dependencies = config.get_user_defined_dependencies();
 
+    // targets execution
     for t in targets {
         match t {
             Target::Build => {
@@ -121,6 +124,12 @@ enum Target {
 
 impl Target {
     /// Parses a string into a `Target` variant.
+    /// 
+    /// # Arguments
+    /// * `text` - The string of potential target. 
+    /// 
+    /// # Errors
+    /// Returns an error, if target string doesn't match any supported target.
     fn from(text: &String) -> Result<Target, String> {
         let value = text.to_ascii_lowercase();
         match value.as_str() {
@@ -169,14 +178,13 @@ fn build_project(
     hex_bin_path: &PathBuf,
     json_output: &bool,
 ) -> Result<(), String> {
-    if !*json_output { 
-        display::info("Starting build process..."); 
-    }
+    if !*json_output { display::info("Starting build process..."); }
 
     if !*json_output { display::info("Configuring cargo..."); }
     if package.hybrid_mode {
+        // config project for the hybrid mode
         prepare_hybrid_mode_compilation(proj_path, board, env, json_output)?;
-        
+        // obtain linker path
         let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
             Ok(path) => match path.to_str() {
                 Some(str_path) => str_path.to_string(),
@@ -192,7 +200,7 @@ fn build_project(
     } else {
         cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, None)?;
     }
-
+    // recreate cargo.toml 
     cargo_toml::create_cargo_toml_config(
         proj_path, 
         &package.name, 

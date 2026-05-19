@@ -28,6 +28,7 @@ use crate::utils;
 /// * The specified `environment` does not exist in the configuration.
 /// * Reading or writing to `Prustio.toml`, `Cargo.toml`, or `.cargo/config.toml` fails.
 pub fn activate_environment(environment: &String, json_output: &bool) -> Result<(), String> {
+    // retrieve project dir and check if it is a project dir
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
@@ -38,6 +39,7 @@ pub fn activate_environment(environment: &String, json_output: &bool) -> Result<
         return Err("Not in project dir.".to_string());
     }
     
+    // fetch project configuration and update the active environment
     let package = prustio_config::get_package_information(&proj_path)?;
     let env = prustio_config::get_env(&proj_path, Some(environment))?;
     
@@ -49,6 +51,7 @@ pub fn activate_environment(environment: &String, json_output: &bool) -> Result<
     let board = board::get_board(&env.board)?;
     let user_dependencies = config.get_user_defined_dependencies();
 
+    // update cargo configuration based on the new active env
     cargo_toml::create_cargo_toml_config(
         &proj_path, 
         &package.name, 
