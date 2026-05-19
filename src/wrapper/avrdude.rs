@@ -49,7 +49,7 @@ pub fn upload_binary(
     let path_string = match hex_path.to_str() {
         Some(path) => String::from("flash:w:") + &String::from(path) + ":i",
         None => {
-            return Err(String::from("Failed to upload binary"));
+            return Err("Failed to upload binary".to_string());
         }
     };
 
@@ -63,13 +63,14 @@ pub fn upload_binary(
                     .output(); 
     
     match output {
-        Ok(output) => {
-            if !output.status.success() {
-                return Err(String::from("Tool avrdude failed."));
+        Ok(out) => {
+            if !out.status.success() {
+                let stderr_str = String::from_utf8_lossy(&out.stderr);
+                return Err(format!("Tool avrdude failed with error:\n{}", stderr_str));
             }
         },
         Err(_) => {
-            return Err(String::from("Failed to run avrdude tool."));
+            return Err("Failed to run avrdude tool.".to_string());
         }
     }
     Ok(())

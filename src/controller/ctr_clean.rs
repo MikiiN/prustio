@@ -26,17 +26,18 @@ use crate::ui::display::info;
 /// * The internal `clear_dir` utility or `cargo clean` fails to remove the directories  
 ///   due to permissions or file locks.
 pub fn clean(json_output: &bool) -> Result<(), String> {
+    // get project's path
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
             return Err("Failed to get current working directory.".to_string());
         },
     };
-
     if !utils::check_if_is_project_dir(&proj_path) {
         return Err("Not in project dir.".to_string());
     }
 
+    // clean temporary files
     let target_dir = proj_path.join("target");
     let prio_dir = proj_path.join(utils::PROJECT_APP_DIR_NAME);
     
@@ -47,7 +48,8 @@ pub fn clean(json_output: &bool) -> Result<(), String> {
 
     if !*json_output { info("Cleaning Cargo temporary files..."); }
     if target_dir.exists() {
-        wrapper::cargo::cargo_clean(&proj_path)?;
+        let show_output = !*json_output;
+        wrapper::cargo::cargo_clean(&proj_path, &show_output)?;
     }
 
     Ok(())

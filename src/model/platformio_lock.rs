@@ -35,6 +35,7 @@ pub struct Dependency {
 /// The root structure representing the `platformio.lock` file.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Lockfile {
+    /// The version of the lock file.
     pub version: u8,
     /// The list of all locked dependencies.
     pub dependencies: Vec<Dependency>,
@@ -44,15 +45,6 @@ impl Lockfile {
     /// Creates a new `Lockfile` instance in memory.
     pub fn new(dependencies: Vec<Dependency>, version: u8) -> Lockfile {
         Lockfile { version, dependencies }
-    }
-
-    /// Updates the existing dependencies and increments the lockfile version.
-    /// 
-    /// # Arguments
-    /// * `dependencies` - The list of the current PlatformIO project dependencies. 
-    pub fn update(&mut self, dependencies: Vec<Dependency>) {
-        self.version += 1;
-        self.dependencies = dependencies;
     }
 
     /// Loads and parses a `platformio.lock` file from the project directory.

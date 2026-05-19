@@ -19,6 +19,10 @@ const PRUSTIO_CONFIG_FILE_NAME: &str = "Prustio.toml";
 pub struct Configuration {
     /// General information about the project.
     pub package: Package,
+
+    /// A map of project additional dependencies (without base avr-hal and others).
+    pub dependencies: Option<BTreeMap<String, toml::Value>>,
+    
     /// A map of available environments (hardware targets), keyed by environment name.
     env: Option<BTreeMap<String, Env>>,
 }
@@ -34,8 +38,10 @@ impl Configuration {
     pub fn from(content: &String) -> Result<Configuration, String> {
         let mut config: Configuration = match toml_edit::de::from_str(content) {
             Ok(c) => c,
-            Err(_) => {
-                return Err(String::from("Failed to parse PrustIO configuration file."));
+            Err(err) => {
+                return Err(
+                    format!("Failed to parse PrustIO configuration file with message:\n {}", err.message())
+                );
             }
         };
 
@@ -62,7 +68,25 @@ impl Configuration {
             Err(_) => return Err("Failed to serialize configuration.".to_string()),
         };
 
-        let clean_toml = raw_toml.replace("[env]\n\n", "");
+        let mut doc = match raw_toml.parse::<toml_edit::DocumentMut>() {
+            Ok(d) => d,
+            Err(_) => return Err("Failed to format Prustio.toml document.".to_string()),
+        };
+
+        // post-processing to prevent [dependencies.name] parts occur
+        if let Some(deps) = doc.get_mut("dependencies").and_then(|i| i.as_table_mut()) {
+            let keys: Vec<String> = deps.iter().filter_map(|(k, v)| {
+                if v.is_table() { Some(k.to_string()) } else { None }
+            }).collect();
+
+            for key in keys {
+                if let Some(toml_edit::Item::Table(t)) = deps.remove(&key) {
+                    deps.insert(&key, toml_edit::Item::Value(toml_edit::Value::InlineTable(t.into_inline_table())));
+                }
+            }
+        }
+
+        let clean_toml = doc.to_string().replace("[env]\n\n", "");
 
         if let Err(_) = fs::write(&file, clean_toml) {
             return Err("Failed to write configuration.".to_string());
@@ -87,6 +111,10 @@ impl Configuration {
             return Err("Invalid environment name.".to_string());
         }
         Err("Empty environment list.".to_string())
+    }
+
+    pub fn get_user_defined_dependencies(&self) -> Option<&BTreeMap<String, toml::Value>> {
+        self.dependencies.as_ref()
     }
 }
 
@@ -187,7 +215,8 @@ fn create_config_without_env(
 ) -> Configuration {
     Configuration {
         package: Package::new(project_name, &"0.1.0".to_string(), hybrid_mode),
-        env: None      
+        dependencies: None,
+        env: None,      
     }
 }
 
@@ -214,6 +243,7 @@ fn create_config_with_env(
     envs.insert(board_id.clone(), env);
     Configuration {
         package: Package::new(project_name, &"0.1.0".to_string(), hybrid_mode),
+        dependencies: None,
         env: Some(envs)
     }
 }
@@ -332,6 +362,7 @@ mod tests {
         let config = Configuration::from(&toml_str.to_string()).unwrap();
         assert_eq!(config.package.name, "test_project");
         assert_eq!(config.package.hybrid_mode, false);
+        assert!(config.dependencies.is_none());
         assert!(config.env.is_none());
     }
 
@@ -353,14 +384,47 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_configuration_with_rust_dependencies() {
+        let toml_str = r#"
+        [package]
+        name = "deps_proj"
+        version = "0.1.0"
+        hybrid_mode = true
+
+        [dependencies]
+        log = "0.4"
+        serde = { version = "1.0", features = ["derive"] }
+        my-local-lib = { path = "../my-local-lib" }
+        "#;
+        let config = Configuration::from(&toml_str.to_string()).unwrap();
+        assert!(config.dependencies.is_some());
+        
+        let deps = config.dependencies.unwrap();
+        
+        assert_eq!(deps.get("log").unwrap().as_str().unwrap(), "0.4");
+        
+        let serde_dep = deps.get("serde").unwrap();
+        assert!(serde_dep.is_table());
+        assert_eq!(serde_dep.get("version").unwrap().as_str().unwrap(), "1.0");
+        assert_eq!(
+            serde_dep.get("features").unwrap().as_array().unwrap()[0].as_str().unwrap(), 
+            "derive"
+        );
+        
+        let local_dep = deps.get("my-local-lib").unwrap();
+        assert!(local_dep.is_table());
+        assert_eq!(local_dep.get("path").unwrap().as_str().unwrap(), "../my-local-lib");
+    }
+
+    #[test]
     fn test_set_active_env_success_and_fail() {
         let mut config = create_config_with_env(&"proj".to_string(), &true, &"uno".to_string(), None);
         
-        // Success case
+        // success case
         assert!(config.set_active_env(&"uno".to_string()).is_ok());
         assert_eq!(config.package.active_env, Some("uno".to_string()));
 
-        // Fail case
+        // fail case
         assert!(config.set_active_env(&"mega".to_string()).is_err());
     }
 }

@@ -112,10 +112,10 @@ pub fn rewrite_pio_config(
         }
     };
 
-    match fs::write(config_file, config_str) {
-        Ok(_) => Ok(()),
-        Err(_) => Err("Failed to write configuration to the PlatformIO's configuration file.".to_string())
+    if let Err(_) = fs::write(config_file, config_str) {
+        return Err("Failed to write configuration to the PlatformIO's configuration file.".to_string());        
     }
+    Ok(())
 }
 
 

@@ -41,13 +41,14 @@ pub fn elf_to_hex(elf_file_path: &PathBuf, hex_file_path: &PathBuf) -> Result<()
                     .arg(hex_file_path)
                     .output();
     match output {
-        Ok(output) => {
-            if !output.status.success() {
-                return Err(String::from("Tool avr-objcopy failed."));
+        Ok(out) => {
+            if !out.status.success() {
+                let stderr_str = String::from_utf8_lossy(&out.stderr);
+                return Err(format!("Tool avr-objcopy failed with error:\n{}", stderr_str));
             }
         },
         Err(_) => {
-            return Err(String::from("Failed to run avr-objcopy tool."));
+            return Err("Failed to run avr-objcopy tool.".to_string());
         }
     }
     Ok(())

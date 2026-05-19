@@ -5,7 +5,7 @@
 //! and identify project boundaries.
 
 use dirs;
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, process::Command};
 
 pub const APP_DIR_NAME: &str = ".prustio";
 pub const PROJECT_APP_DIR_NAME: &str = ".prio";
@@ -35,6 +35,18 @@ pub fn ensure_dir_exists(path: &PathBuf) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+pub fn is_python_installed() -> bool {
+    match Command::new("python").arg("--version").output() {
+        Ok(output) => {
+            if output.status.success() {
+                return true;
+            } 
+        },
+        _ => {}
+    };
+    false
 }
 
 /// Completely removes a directory and all of its contents.
@@ -106,6 +118,9 @@ pub fn get_app_dir() -> Result<PathBuf, String>  {
 
 /// Retrieves the path to the current project's local `.prio` application directory.
 ///
+/// # Arguments
+/// * `proj_path` - The path of the project.
+/// 
 /// # Errors
 /// Returns an error if the directory cannot be created.
 pub fn get_project_app_dir(proj_path: &PathBuf) -> Result<PathBuf, String> {
@@ -116,6 +131,9 @@ pub fn get_project_app_dir(proj_path: &PathBuf) -> Result<PathBuf, String> {
 
 /// Checks if the given path contains a valid `pRustIO` project.
 ///
+/// # Arguments
+/// * `proj_path` - The path of the project.
+/// 
 /// Currently, this checks for the presence of a `Prustio.toml` file.
 pub fn check_if_is_project_dir(path: &PathBuf) -> bool {
     // TODO - do better checks
@@ -124,7 +142,10 @@ pub fn check_if_is_project_dir(path: &PathBuf) -> bool {
 }
 
 /// Checks if the given path contains a valid PlatformIO project.
-///
+/// 
+/// # Arguments
+/// * `proj_path` - The path of the project.
+/// 
 /// Currently, this checks for the presence of a `platformio.ini` file.
 pub fn check_if_is_pio_dir(path: &PathBuf) -> bool {
     let conf_file = path.join("platformio.ini");

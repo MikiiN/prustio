@@ -1,3 +1,10 @@
+//! Main controller module for the pRustIO application.
+//!
+//! This module acts as the central hub of the application. It connects 
+//! the user interface (CLI commands) to the underlying logic. It routes 
+//! the user's commands to specific sub-controllers, such as managing 
+//! projects, running builds, or communicating with hardware devices.
+
 use clap::Parser;
 
 use crate::ui;
@@ -14,25 +21,36 @@ mod ctr_project;
 mod ctr_refresh;
 mod ctr_run;
 
+/// Executes the main logic of the application and returns the corresponding
+/// exit code.
+///
+/// This function is the main entry point after the program starts. 
+/// First, it checks if PlatformIO is installed and tries to set it up 
+/// if it is missing. Then, it parses the command-line arguments 
+/// provided by the user and runs the corresponding command.
+///
+/// Finally, it prints a success message or an error message based on 
+/// the result.
+///
 pub fn execute() -> i32 {
+    let cli = ui::Cli::parse();
+    let json_flag = is_json_output(&cli);
+    
     if !platformio::check_pio_installation() {
         if let Err(_) = platformio::setup_platformio() {
-            display::error("Can not install application's instance of PlatformIO");
+            display::error("Can not install application's instance of PlatformIO", &json_flag);
             return 1;
         }
     }
 
-    let cli = ui::Cli::parse();
     match run_command(&cli) {
         Ok(output) => {
             if let Some(msg) = output {
-                display::success(msg.as_str());
-            } else {
-                display::success("Successfully executed command.");
-            }
+                display::success(msg.as_str(), &json_flag);
+            } 
         },
         Err(msg) => {
-            display::error(msg.as_str());
+            display::error(msg.as_str(), &json_flag);
             return 1;
         }
     }
@@ -40,15 +58,33 @@ pub fn execute() -> i32 {
     return 0;
 }
 
+/// Routes the parsed CLI command to the correct sub-controller.
+///
+/// This function takes the parsed command-line interface (CLI) data 
+/// and uses a `match` statement to find out which action the user 
+/// wants to perform. It then calls the right function from the
+/// specialized sub-controllers to do the actual work.
+///
+/// # Arguments
+/// * `cli` - A reference to the parsed CLI arguments.
+///
+/// # Returns
+/// * `Ok(Some(String))` - A custom success message to show to the user.
+/// * `Ok(None)` - The command succeeded, and a default success message will be used.
+/// * `Err(String)` - An error message explaining why the command failed.
 fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
     match &cli.command {
         ui::TopLevelCommands::Boards { filter, json_output } => {
-            ctr_board::board(filter.as_ref(), json_output)?;
+            let output = ctr_board::board(filter.as_ref(), json_output)?;
+            display::unformatted_print(&output);
+            return Ok(None);
         },
 
         ui::TopLevelCommands::Device { command } => match command {
             DeviceCommands::List { json_output } => {
-                ctr_device::device_list(json_output);
+                let output = ctr_device::device_list(json_output)?;
+                display::unformatted_print(&output);
+                return Ok(None);
             },
             DeviceCommands::Monitor { 
                 port, baud, parity, rtscts, xonxoff, rts, 
@@ -88,5 +124,26 @@ fn run_command(cli: &ui::Cli) -> Result<Option<String>, String> {
             return Ok(Some("Clean command run successfully.".to_string()));
         },
     }
-    Ok(None)
+    Ok(Some("Successfully executed command.".to_string()))
+}
+
+/// Helper function to determine if the user requested JSON output.
+/// 
+/// # Arguments
+/// * `cli` - A reference to the parsed CLI arguments.
+fn is_json_output(cli: &ui::Cli) -> bool {
+    match &cli.command {
+        ui::TopLevelCommands::Boards { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Device { command } => match command {
+            DeviceCommands::List { json_output } => *json_output,
+            DeviceCommands::Monitor { .. } => false,
+        },
+        ui::TopLevelCommands::Project { command } => match command {
+            ProjectCommands::Init { json_output, .. } => *json_output,
+        },
+        ui::TopLevelCommands::Run { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Activate { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Refresh { json_output, .. } => *json_output,
+        ui::TopLevelCommands::Clean { json_output, .. } => *json_output,
+    }
 }

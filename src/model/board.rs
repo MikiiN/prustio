@@ -158,6 +158,14 @@ impl Platform {
             Self::UNKNOWN => UNSPECIFIED_PARAM.to_string()
         }
     }
+
+    /// Returns the Platformio C++ framework for architecture. Currently tool support a single
+    /// architecture.
+    pub fn to_framework(&self) -> String {
+        match self {
+            _ => String::from("arduino"),
+        }
+    }
 }
 
 impl fmt::Display for Platform {
@@ -199,7 +207,7 @@ fn get_pio_board(id: &str) -> Result<PioBoard, String> {
     match get_pio_boards(id) {
         Ok(boards) => {
             if boards.is_empty() {
-                return Err(String::from("Invalid board ID"));
+                return Err("Unsupported board ID".to_string());
             }
             for board in &boards {
                 if board.id == id {
@@ -222,20 +230,10 @@ fn get_pio_board(id: &str) -> Result<PioBoard, String> {
 /// # Errors
 /// Returns an error if the PlatformIO execution fails.
 fn get_pio_boards(filter: &str) -> Result<Vec<PioBoard>, String> {
-    let result = platformio::get_boards(filter);
-    match result {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            match serde_json::from_str::<Vec<PioBoard>>(&output_str) {
-                Ok(boards) => { return Ok(boards); },
-                Err(_) => { 
-                    return Err(String::from("Failed to parse JSON from platformIO.")); 
-                }
-            }
-        },
-        Err(_) => {
-            return Err(String::from("PlatformIO failed to find the specified board"));
-        }
+    let result = platformio::get_boards(filter)?;
+    match serde_json::from_str::<Vec<PioBoard>>(result.as_str()) {
+        Ok(boards) => Ok(boards),
+        Err(_) =>  Err("Failed to parse JSON from platformIO.".to_string())
     }
 }
 
@@ -248,9 +246,7 @@ fn get_pio_boards(filter: &str) -> Result<Vec<PioBoard>, String> {
 /// Internal struct representing a PlatformIO board manifest JSON file.
 #[derive(Deserialize, Debug)]
 struct PioBoardManifest {
-    name: String,
     upload: PioUploadConfig,
-    build: Option<PioBuildConfig>,
 }
 
 /// Internal struct representing the upload specifications for a board.
@@ -258,12 +254,6 @@ struct PioBoardManifest {
 struct PioUploadConfig {
     speed: u32, 
     protocol: String,
-}
-
-/// Internal struct representing the build specifications for a board.
-#[derive(Deserialize, Debug)]
-struct PioBuildConfig {
-    mcu: Option<String>,
 }
 
 /// Reads the PlatformIO JSON manifest for a specific board to extract its upload configuration.
@@ -277,27 +267,30 @@ struct PioBuildConfig {
 /// # Errors
 /// Returns an error if the board manifest file cannot be found, read, or parsed.
 fn get_pio_upload_config(board_id: &str, platform: &str) -> Result<PioUploadConfig, String> {
+    // download platform's configurations if missing
     let (_, core_dir) = platformio::get_pio_dirs()?;
     let confs_path = core_dir.join(PLATFORMS_DIR).join(platform).join(BOARDS_DIR);
     if !confs_path.exists() {
         platformio::download_pio_platform(platform)?;
     }
     
+    // get specific configuration
     let board_path = confs_path.join(format!("{board_id}.json"));
     if !board_path.exists() {
-        return Err(String::from("Unknown board ID."));
+        return Err("Unsupported board identifier.".to_string());
     }
     let file_contents = match fs::read_to_string(&board_path) {
         Ok(s) => s,
         Err(_) => {
-            return Err(String::from("Failed to read configuration file."));
+            return Err("Failed to read board's configuration file.".to_string());
         }
     };
 
+    // parse configuration to struct
     let manifest: PioBoardManifest = match serde_json::from_str(&file_contents) {
         Ok(json) => json,
         Err(_) => {
-            return Err(String::from("Failed to parse board configuration."));
+            return Err("Failed to parse board's configuration file.".to_string());
         }
     };
     
@@ -360,6 +353,9 @@ pub fn get_boards(filter: Option<&String>) -> Result<Vec<Board>, String> {
 }
 
 /// Filters the supported board IDs by checking if they contain the given filter string (case-insensitive).
+/// 
+/// # Arguments
+/// * `filter` - The filter string for board identifiers.
 fn get_filtered_board_ids(filter: &String) -> Vec<&str> {
     let parsed_filter = filter.to_lowercase();
     let board_ids: Vec<&str> = SUPPORTED_BOARD_IDS.iter()

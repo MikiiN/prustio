@@ -28,6 +28,7 @@ use crate::utils;
 /// * The `Prustio.toml` configuration cannot be read or parsed.
 /// * There is no currently active environment set for the project.
 pub fn refresh(json_output: &bool) -> Result<(), String> {
+    // get project's path
     let proj_path = match env::current_dir() {
         Ok(path) => path,
         Err(_) => {
@@ -37,6 +38,8 @@ pub fn refresh(json_output: &bool) -> Result<(), String> {
     if !utils::check_if_is_project_dir(&proj_path) {
         return Err("Not in project dir.".to_string());
     }
+
+    // refresh project's configuration using active command  
     let package = prustio_config::get_package_information(&proj_path)?;
     if let Some(active_env) = package.active_env {
         ctr_activate::activate_environment(&active_env, json_output)?;
