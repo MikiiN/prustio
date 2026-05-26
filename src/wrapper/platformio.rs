@@ -43,31 +43,26 @@ pub fn check_pio_installation() -> bool {
 /// # Errors
 /// Returns an error, if command execution or parsing to string fails.
 pub fn get_boards(filter: &str) -> Result<String, String> {
-    let mut cmd = Command::new("pio");
-    let result = cmd.args(["boards", filter, "--json-output"]).output();
+    let (venv_dir, core_dir) = get_pio_dirs()?;
+    let args = [
+        "boards", filter, "--json-output"
+    ];
 
-    match result {
-        Ok(output) => {
-            // check if command failed
-            if !output.status.success() {
-                let stderr_str = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Tool PlatformIO failed with error:\n{}", stderr_str));
-            }
-
-            // parsing raw output to String
-            match str::from_utf8(&output.stdout) {
-                Ok(out_str) => {
-                    return Ok(out_str.to_string());
-                },
-                Err(_) => {
-                    return Err("Failed to parse board output form PlatformIO.".to_string());
-                }
-            };
+    let output = run_pio_command(&venv_dir, &core_dir, &args, None);
+    let boards = check_command_output(
+        output, 
+        "PlatformIO failed to find the specified board",
+        "Tool PlatformIO failed with error:", 
+    )?;
+    
+    match String::from_utf8(boards) {
+        Ok(out_str) => {
+            return Ok(out_str.to_string());
         },
         Err(_) => {
-            return Err("PlatformIO failed to find the specified board".to_string());
+            return Err("Failed to parse board output form PlatformIO.".to_string());
         }
-    };
+    }
 }
 
 /// Retrieves the paths to the PlatformIO virtual environment and core directories.
