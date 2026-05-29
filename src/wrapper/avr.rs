@@ -68,7 +68,12 @@ pub fn elf_to_hex(elf_file_path: &PathBuf, hex_file_path: &PathBuf) -> Result<()
 /// toolchain download process fails.
 pub fn obtain_bin_path(bin_name: &str) -> Result<PathBuf, String> {
     let (_, core_dir) = platformio::get_pio_dirs()?;
-
+    #[cfg(target_os = "windows")]
+    let bin_path = core_dir.join("packages")
+                           .join(PIO_AVR_PACKAGE)
+                           .join(BINARY_DIRECTORY)
+                           .join(format!("{}.exe", bin_name));
+    #[cfg(not(target_os = "windows"))]
     let bin_path = core_dir.join("packages")
                            .join(PIO_AVR_PACKAGE)
                            .join(BINARY_DIRECTORY)
