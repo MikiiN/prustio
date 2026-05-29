@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "prustio"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "assert_cmd",
  "clap",

@@ -188,24 +188,21 @@ fn build_project(
 
     if !*json_output { display::info("Configuring cargo..."); }
     if package.hybrid_mode {
-        // config project for the hybrid mode
         prepare_hybrid_mode_compilation(proj_path, board, env, json_output)?;
-        // obtain linker path
-        let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
-            Ok(path) => match path.to_str() {
-                Some(str_path) => str_path.to_string(),
-                None => {
-                    return Err("Failed to obtain avr-gcc binary path.".to_string());
-                }
-            },
-            Err(msg) => {
-                return Err(msg);
-            }
-        };
-        cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, Some(&linker))?;
-    } else {
-        cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, None)?;
     }
+    let linker = match avr::obtain_bin_path(avr::GCC_BINARY_NAME) {
+        Ok(path) => match path.to_str() {
+            Some(str_path) => str_path.to_string(),
+            None => {
+                return Err("Failed to obtain avr-gcc binary path.".to_string());
+            }
+        },
+        Err(msg) => {
+            return Err(msg);
+        }
+    };
+    cargo_config_toml::update_cargo_config(proj_path, &board_arch, &board.mcu, Some(&linker))?;
+
     // recreate cargo.toml 
     cargo_toml::create_cargo_toml_config(
         proj_path, 

@@ -605,13 +605,15 @@ fn run_pio_command(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args: &[&str], ru
         Some(dir) => {
             Command::new(pio_path)
                 .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .env("PYTHONIOENCODING", "utf-8")
                 .args(pio_args)
                 .current_dir(dir)
                 .output()
         },
         None => {
             Command::new(pio_path)
-                .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .env("PLATFORMIO_CORE_DIR", core_dir)
+                .env("PYTHONIOENCODING", "utf-8") 
                 .args(pio_args)
                 .output()
         }
@@ -636,6 +638,7 @@ fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args:
         Some(dir) => {
             Command::new(pio_path)
                 .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .env("PYTHONIOENCODING", "utf-8")
                 .args(pio_args)
                 .current_dir(dir)
                 .stdin(Stdio::inherit())
@@ -647,6 +650,7 @@ fn run_pio_command_with_output(venv_dir: &PathBuf, core_dir: &PathBuf, pio_args:
         None => {
             Command::new(pio_path)
                 .env("PLATFORMIO_CORE_DIR", core_dir) 
+                .env("PYTHONIOENCODING", "utf-8")
                 .args(pio_args)
                 .stdin(Stdio::inherit())
                 .stdout(Stdio::inherit())

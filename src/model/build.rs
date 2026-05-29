@@ -52,10 +52,12 @@ pub fn write_build_configuration(proj_path: &PathBuf, lib_names: &Vec<String>) -
 /// * `lib_dir` - The path of directory containing compiled libraries.
 /// * `lib_names` - The vector of libraries names
 fn get_build_content(lib_dir: &PathBuf, lib_names: &Vec<String>) -> String {
-    let mut content = String::from("fn main() {\n");
-    content += format!("    println!(\"cargo:rustc-link-search=native={}\");\n", lib_dir.display()).as_str();
+    let lib_dir_str = lib_dir.display().to_string().replace('\\', "/");
 
-    content += format!("    println!(\"cargo:rustc-link-arg={}/wrapper.cpp.o\");", lib_dir.display()).as_str();
+    let mut content = String::from("fn main() {\n");
+    content += format!("    println!(\"cargo:rustc-link-search=native={}\");\n", lib_dir_str).as_str();
+
+    content += format!("    println!(\"cargo:rustc-link-arg={}/wrapper.cpp.o\");", lib_dir_str).as_str();
 
     for name in lib_names {
         content += format!("\n    println!(\"cargo:rustc-link-arg=-l{}\");", name).as_str();
