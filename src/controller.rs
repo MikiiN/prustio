@@ -35,10 +35,14 @@ mod ctr_run;
 pub fn execute() -> i32 {
     let cli = ui::Cli::parse();
     let json_flag = is_json_output(&cli);
-    
+
     if !platformio::check_pio_installation() {
-        if let Err(_) = platformio::setup_platformio() {
-            display::error("Can not install application's instance of PlatformIO", &json_flag);
+        if let Err(error) = platformio::setup_platformio() {
+            let msg = format!(
+                "Can not install application's instance of PlatformIO: {}",
+                error
+            );
+            display::error(&msg, &json_flag);
             return 1;
         }
     }
